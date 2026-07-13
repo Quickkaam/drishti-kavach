@@ -31,7 +31,7 @@ const generateTokens = (userId, role) => {
 };
 
 // POST /api/auth/login
-router.post('/login', validate(loginSchema), verifyTurnstile({ optional: false }), async (req, res) => {
+router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true }), async (req, res) => {
   try {
     const { email, password } = req.body;
 
