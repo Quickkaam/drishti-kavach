@@ -52,7 +52,7 @@ export default function LoginPage() {
   const turnstileWidgetRef = useRef(null);
 
   // Get Turnstile site key from environment
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAD1DJr7K87Ceczuc';
   console.log('Turnstile site key:', turnstileSiteKey ? 'LOADED' : 'MISSING');
 
   // Initialize Turnstile
