@@ -5,7 +5,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import api from '../api/client';
-import logo from '/drishti-kavach-logo.png';
+import logo from '/drishti-ai-logo.png';
 
 const QUICK_PROMPTS = [
   "Show me today's threats",
