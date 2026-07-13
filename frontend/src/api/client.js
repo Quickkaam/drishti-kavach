@@ -23,7 +23,10 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config;
-    if (err.response?.status === 401 && err.response?.data?.code === 'TOKEN_EXPIRED' && !original._retry) {
+    const tokenExpired = err.response?.data?.code === 'TOKEN_EXPIRED';
+    
+    // If 401 and we have a refresh token, try to refresh
+    if (err.response?.status === 401 && localStorage.getItem('dk_refresh') && !original._retry) {
       original._retry = true;
       try {
         const refreshToken = localStorage.getItem('dk_refresh');
