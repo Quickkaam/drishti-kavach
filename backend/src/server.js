@@ -53,11 +53,13 @@ app.use(helmet({
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:5173',
-    /\.quickkaam\.in$/,
-    /localhost/,
+    'https://drishti-kavach.vercel.app',
+    /\.quickkaam\.in$/i,
+    /localhost/i,
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
 }));
 
 app.use(express.json({ limit: '1mb' }));
