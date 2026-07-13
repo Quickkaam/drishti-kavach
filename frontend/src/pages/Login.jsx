@@ -48,18 +48,31 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle | scanning | authenticated
   const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileLoaded, setTurnstileLoaded] = useState(false);
   const turnstileWidgetRef = useRef(null);
+
+  // Get Turnstile site key from environment
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  console.log('Turnstile site key:', turnstileSiteKey ? 'LOADED' : 'MISSING');
 
   // Initialize Turnstile
   useEffect(() => {
+    if (!turnstileSiteKey) {
+      console.error('Turnstile site key not configured');
+      setError('Security verification not configured');
+      return;
+    }
+
     const initTurnstile = () => {
       if (window.turnstile && !turnstileWidgetRef.current) {
+        console.log('Rendering Turnstile widget...');
         turnstileWidgetRef.current = window.turnstile.render('#turnstile-widget-login', {
-          sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA',
+          sitekey: turnstileSiteKey,
           theme: 'dark',
           size: 'normal',
           callback: (token) => {
             setTurnstileToken(token);
+            console.log('Turnstile token received');
           },
           'expired-callback': () => {
             setTurnstileToken('');
@@ -67,21 +80,28 @@ export default function LoginPage() {
               window.turnstile.reset(turnstileWidgetRef.current);
             }
           },
-          'error-callback': () => {
+          'error-callback': (err) => {
             setTurnstileToken('');
-            console.error('Turnstile widget error');
+            console.error('Turnstile widget error:', err);
+            setError('Security verification failed');
           },
         });
+        setTurnstileLoaded(true);
       }
     };
 
-    // Load Turnstile script if not already loaded
-    if (!document.querySelector('script[src*="challenges.cloudflare.com"]')) {
+    // Check if Turnstile script is already loaded
+    if (!window.turnstile) {
+      console.log('Loading Turnstile script...');
       const script = document.createElement('script');
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
       script.async = true;
       script.defer = true;
       script.onload = initTurnstile;
+      script.onerror = () => {
+        console.error('Failed to load Turnstile script');
+        setError('Failed to load security verification');
+      };
       document.head.appendChild(script);
     } else {
       initTurnstile();
@@ -92,7 +112,7 @@ export default function LoginPage() {
         window.turnstile.remove(turnstileWidgetRef.current);
       }
     };
-  }, []);
+  }, [turnstileSiteKey]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
