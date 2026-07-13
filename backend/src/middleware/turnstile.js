@@ -16,7 +16,7 @@ const verifyTurnstile = (options = {}) => {
   const { optional = false, field = 'turnstile_token' } = options;
 
   return async (req, res, next) => {
-    // Skip if no Turnstile secret key configured (development)
+    // Skip if TURNSTILE_SECRET_KEY not configured (development)
     if (!process.env.TURNSTILE_SECRET_KEY) {
       if (process.env.NODE_ENV === 'development') {
         console.warn('Turnstile: No secret key configured, skipping verification');
@@ -24,6 +24,12 @@ const verifyTurnstile = (options = {}) => {
       } else {
         return res.status(500).json({ error: 'Turnstile configuration missing' });
       }
+    }
+
+    // Skip if SKIP_TURNSTILE is set (for local testing or special cases)
+    if (process.env.SKIP_TURNSTILE === 'true') {
+      console.warn('Turnstile: SKIP_TURNSTILE=true, skipping verification');
+      return next();
     }
 
     const token = req.body[field] || req.query[field];
