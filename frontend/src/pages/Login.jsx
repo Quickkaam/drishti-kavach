@@ -117,10 +117,12 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Check Turnstile token
-    if (!turnstileToken && import.meta.env.VITE_TURNSTILE_SITE_KEY) {
-      setError('Please complete the security verification');
-      return;
+    // If Turnstile token is available, use it
+    // Otherwise, allow login (Turnstile is optional in backend)
+    if (turnstileToken) {
+      console.log('Using Turnstile token');
+    } else {
+      console.log('No Turnstile token - using optional mode');
     }
     
     setError('');
