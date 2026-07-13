@@ -5,6 +5,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import api from '../api/client';
+import logo from '/drishti-kavach-logo.png';
 
 const QUICK_PROMPTS = [
   "Show me today's threats",
@@ -63,9 +64,9 @@ export default function DrishtiAI() {
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-4 flex-shrink-0">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center border border-gold-400/40"
+        <div className="w-12 h-12 rounded-full flex items-center justify-center border border-gold-400/40 overflow-hidden"
              style={{ background: 'radial-gradient(circle, rgba(245,176,65,0.2) 0%, transparent 70%)' }}>
-          <span className="text-xl">🤖</span>
+          <img src={logo} alt="Drishti AI" className="w-full h-full object-cover" />
         </div>
         <div>
           <h1 className="text-xl font-bold text-white">Drishti AI</h1>
