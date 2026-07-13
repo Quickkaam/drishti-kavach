@@ -1,6 +1,6 @@
 // ============================================
 // Drishti Kavach — Drishti AI Service
-// Powered by DeepSeek API
+// Powered by Groq and OpenRouter AI
 // ============================================
 
 const axios = require('axios');
@@ -9,8 +9,18 @@ const { getIpIntel } = require('./ipIntel');
 const { autoBlockIp } = require('./ddos');
 const alertService = require('./alerts');
 
-const DEEPSEEK_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
-const MODEL = 'deepseek-chat';
+// AI Provider Configuration
+const AI_PROVIDER = (process.env.AI_PROVIDER || 'groq').toLowerCase();
+let DEEPSEEK_URL;
+let MODEL;
+
+if (AI_PROVIDER === 'groq') {
+  DEEPSEEK_URL = 'https://api.groq.com/openai/v1';
+  MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+} else {
+  DEEPSEEK_URL = 'https://openrouter.ai/api/v1';
+  MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
+}
 
 // API Keys with fallback support
 const API_KEYS = [
