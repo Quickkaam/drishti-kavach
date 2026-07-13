@@ -36,6 +36,8 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
     const { email, password } = req.body;
 
     console.log('Login attempt:', { email, passwordLength: password?.length });
+    console.log('DEEPSEEK_API_KEY configured:', !!process.env.DEEPSEEK_API_KEY);
+    console.log('DEEPSEEK_API_KEY_BACKUP configured:', !!process.env.DEEPSEEK_API_KEY_BACKUP);
 
     const emailHash = crypto.createHash('sha512').update(email).digest('hex');
 
