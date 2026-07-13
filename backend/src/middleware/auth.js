@@ -4,6 +4,7 @@
 
 const jwt = require('jsonwebtoken');
 const supabase = require('../db/supabase');
+const encryption = require('../utils/encryption');
 
 // Verify JWT token
 const requireAuth = async (req, res, next) => {
@@ -19,12 +20,22 @@ const requireAuth = async (req, res, next) => {
     // Fetch user from DB to ensure still active
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, username, email, role, is_active')
+      .select('*')
       .eq('id', decoded.userId)
       .single();
 
     if (error || !user || !user.is_active) {
       return res.status(401).json({ error: 'Invalid or inactive user' });
+    }
+
+    // Decrypt email if needed
+    if (user.email_encrypted) {
+      try {
+        user.email = await encryption.decryptData(user.email_encrypted);
+      } catch (decryptError) {
+        console.error('Auth middleware: Failed to decrypt email', decryptError);
+        user.email = null;
+      }
     }
 
     req.user = user;
