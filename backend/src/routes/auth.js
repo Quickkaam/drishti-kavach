@@ -35,6 +35,8 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: false }
   try {
     const { email, password } = req.body;
 
+    console.log('Login attempt:', { email, passwordLength: password?.length });
+
     const emailHash = crypto.createHash('sha512').update(email).digest('hex');
 
     const { data: user, error } = await supabase
@@ -45,8 +47,11 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: false }
       .single();
 
     if (error || !user) {
+      console.log('User not found:', { email, emailHash, error: error?.message });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    console.log('User found:', { id: user.id, emailHash: user.email_hash, password_algorithm: user.password_algorithm });
 
     let valid = false;
     if (user.password_algorithm === 'pbkdf2-sha512') {
@@ -58,13 +63,18 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: false }
         'sha512'
       ).toString('hex');
       valid = hash === user.password_hash;
+      console.log('PBKDF2 check:', { hashMatches: valid, password_iterations: user.password_iterations });
     } else {
       valid = await bcrypt.compare(password, user.password_hash);
+      console.log('Bcrypt check:', { hashMatches: valid });
     }
 
     if (!valid) {
+      console.log('Password validation failed:', { providedPassword: password, storedHash: user.password_hash?.substring(0, 50) + '...' });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    console.log('Login successful for user:', user.id);
 
     // Update last login
     await supabase.from('users').update({
@@ -85,6 +95,7 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: false }
       },
     });
   } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
 });
