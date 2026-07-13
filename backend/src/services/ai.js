@@ -28,6 +28,11 @@ const API_KEYS = [
   process.env.DEEPSEEK_API_KEY_BACKUP,
 ].filter(key => key && key.trim() !== '');
 
+console.log('[AI Service] Provider:', AI_PROVIDER);
+console.log('[AI Service] URL:', DEEPSEEK_URL);
+console.log('[AI Service] Model:', MODEL);
+console.log('[AI Service] API Keys configured:', API_KEYS.length);
+
 let currentApiKeyIndex = 0;
 
 function getNextApiKey() {
