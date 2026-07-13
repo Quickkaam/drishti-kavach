@@ -1,0 +1,118 @@
+// ============================================
+// Drishti Kavach — Auth Routes
+// ============================================
+
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
+const supabase = require('../db/supabase');
+const { validate, loginSchema } = require('../middleware/validate');
+const { requireAuth } = require('../middleware/auth');
+const { verifyTurnstile } = require('../middleware/turnstile');
+
+const router = express.Router();
+
+const crypto = require('crypto');
+
+// Generate tokens
+const generateTokens = (userId, role) => {
+  const access = jwt.sign(
+    { userId, role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
+  );
+  const refresh = jwt.sign(
+    { userId, role, jti: uuidv4() },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+  );
+  return { access, refresh };
+};
+
+// POST /api/auth/login
+router.post('/login', validate(loginSchema), verifyTurnstile({ optional: false }), async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const emailHash = crypto.createHash('sha512').update(email).digest('hex');
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email_hash', emailHash)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    let valid = false;
+    if (user.password_algorithm === 'pbkdf2-sha512') {
+      const hash = crypto.pbkdf2Sync(
+        password,
+        Buffer.from(user.password_salt, 'hex'),
+        user.password_iterations || 100000,
+        64,
+        'sha512'
+      ).toString('hex');
+      valid = hash === user.password_hash;
+    } else {
+      valid = await bcrypt.compare(password, user.password_hash);
+    }
+
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Update last login
+    await supabase.from('users').update({
+      last_login: new Date().toISOString(),
+      last_ip: req.ip,
+    }).eq('id', user.id);
+
+    const { access, refresh } = generateTokens(user.id, user.role);
+
+    res.json({
+      token: access,
+      refresh_token: refresh,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// POST /api/auth/refresh
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refresh_token } = req.body;
+    if (!refresh_token) return res.status(400).json({ error: 'Refresh token required' });
+
+    const decoded = jwt.verify(refresh_token, process.env.JWT_REFRESH_SECRET);
+    const { access, refresh } = generateTokens(decoded.userId, decoded.role);
+
+    res.json({ token: access, refresh_token: refresh });
+  } catch {
+    res.status(401).json({ error: 'Invalid refresh token' });
+  }
+});
+
+// POST /api/auth/logout
+router.post('/logout', requireAuth, (_req, res) => {
+  // Client should discard token; future: implement token blocklist
+  res.json({ message: 'Logged out' });
+});
+
+// GET /api/auth/me
+router.get('/me', requireAuth, (req, res) => {
+  res.json({ user: req.user });
+});
+
+module.exports = router;

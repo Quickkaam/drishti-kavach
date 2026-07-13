@@ -1,0 +1,103 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   DRISHTI KAVACH - PRODUCTION DEPLOYMENT                     ║
+║                         दृष्टि कवच — The Vision Shield                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+✅ WHAT'S DONE:
+   • Backend API - Complete (all routes ready)
+   • Frontend Build - Complete (production build ready)
+   • AI Integration - Complete (DeepSeek multi-key fallback)
+   • Email Proxy - Complete (service ready)
+   • Security - Complete (Turnstile middleware ready)
+   • Database - Complete (21 tables in Supabase)
+
+❌ WHAT'S NEEDED TO GO LIVE:
+   1. Cloudflare Turnstile Keys
+   2. EmailJS Credentials
+   3. Deploy Backend to Render/Heroku
+   4. Deploy Frontend to Vercel/Netlify
+   5. Update API URLs
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚡ QUICK SETUP (15 minutes total):
+
+STEP 1: Get Cloudflare Turnstile (5 min)
+   → https://dash.cloudflare.com/
+   → Add Site → Copy Site Key + Secret Key
+   → Add to backend/.env: TURNSTILE_SECRET_KEY=...
+   → Add to frontend/.env: VITE_TURNSTILE_SITE_KEY=...
+
+STEP 2: Get EmailJS (5 min)
+   → https://www.emailjs.com/
+   → Add Service → Add Template → Get Credentials
+   → Add to backend/.env:
+      EMAILJS_SERVICE_ID=...
+      EMAILJS_TEMPLATE_ID=...
+      EMAILJS_PUBLIC_KEY=...
+
+STEP 3: Deploy Backend (3 min)
+   → https://render.com/
+   → New Web Service → Connect GitHub
+   → Root Dir: Drishti Kavach/backend
+   → Build: npm install, Start: npm run dev
+   → Add all env vars from backend/.env
+   → Copy deployment URL
+
+STEP 4: Deploy Frontend (2 min)
+   → https://vercel.com/
+   → New Project → Import GitHub
+   → Root Dir: Drishti Kavach/frontend
+   → Build: npm run build
+   → Add all env vars from frontend/.env
+   → Update VITE_API_URL to backend URL
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📄 REQUIRED FILES TO UPDATE:
+
+backend/.env:
+   TURNSTILE_SECRET_KEY=your_secret_key_here
+   EMAILJS_SERVICE_ID=your_service_id_here
+   EMAILJS_TEMPLATE_ID=your_template_id_here
+   EMAILJS_PUBLIC_KEY=your_public_key_here
+
+frontend/.env:
+   VITE_API_URL=https://your-backend-url/api
+   VITE_TURNSTILE_SITE_KEY=your_site_key_here
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🧪 TEST AFTER DEPLOYMENT:
+
+Health Check:
+   curl https://api.yourdomain.com/api/health
+
+Login Test:
+   https://app.yourdomain.com
+   Email: whitehatwolf22@gmail.com
+   Password: Coco@22/07/2001
+
+Form Test:
+   Fill contact form → Submit → Check if received
+
+AI Test:
+   Click Drishti AI icon → Ask: "Show me today's threats"
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTATION:
+
+   • PRODUCTION_SETUP_GUIDE.md - Detailed setup instructions
+   • NEXT_STEPS.md - Quick reference for deployment
+   • DEPLOYMENT_READY.md - Deployment overview
+   • .secrets.txt - Production secrets (KEEP SECURE!)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🛡️  दृष्टिः रक्षति, रक्षा दृश्यते
+   "Vision protects, and protection is seen."
+
+═══════════════════════════════════════════════════════════════════════════════
+
+For questions, check the documentation files or review logs on your hosting platform.

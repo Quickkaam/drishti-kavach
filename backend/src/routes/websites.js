@@ -1,0 +1,186 @@
+// ============================================
+// Drishti Kavach — Websites (Multi-Tenant) Routes
+// ============================================
+
+const express = require('express');
+const crypto = require('crypto');
+const supabase = require('../db/supabase');
+const { requireAuth, requireRole } = require('../middleware/auth');
+const { validate, websiteSchema } = require('../middleware/validate');
+
+const router = express.Router();
+router.use(requireAuth);
+
+const generateApiKey = () => `dk_${crypto.randomBytes(24).toString('hex')}`;
+
+// GET /api/websites
+router.get('/', async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('websites')
+      .select('*, clients(company_name)')
+      .order('created_at', { ascending: false });
+    res.json({ websites: data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch websites' });
+  }
+});
+
+// POST /api/websites — Add new website
+router.post('/', requireRole('admin'), validate(websiteSchema), async (req, res) => {
+  try {
+    const { name, domain, client_id, settings } = req.body;
+    const apiKey = generateApiKey();
+
+    const { data, error } = await supabase
+      .from('websites')
+      .insert({ name, domain, client_id, api_key: apiKey, settings })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await supabase.from('audit_logs').insert({
+      admin_user: req.user.username,
+      action: 'website_added',
+      target: domain,
+      details: { name },
+      ip_address: req.ip,
+    });
+
+    res.status(201).json({ website: data, api_key: apiKey });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Domain already registered' });
+    res.status(500).json({ error: 'Failed to add website' });
+  }
+});
+
+// GET /api/websites/:id
+router.get('/:id', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('websites')
+      .select('*, clients(company_name, contact_email)')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error || !data) return res.status(404).json({ error: 'Website not found' });
+    res.json({ website: data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch website' });
+  }
+});
+
+// PATCH /api/websites/:id
+router.patch('/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const { name, status, settings } = req.body;
+    const updates = { updated_at: new Date().toISOString() };
+    if (name) updates.name = name;
+    if (status) updates.status = status;
+    if (settings) updates.settings = settings;
+
+    const { data, error } = await supabase
+      .from('websites')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ website: data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update website' });
+  }
+});
+
+// DELETE /api/websites/:id
+router.delete('/:id', requireRole('admin'), async (req, res) => {
+  try {
+    await supabase.from('websites').update({ status: 'inactive' }).eq('id', req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to remove website' });
+  }
+});
+
+// POST /api/websites/:id/regenerate-key
+router.post('/:id/regenerate-key', requireRole('admin'), async (req, res) => {
+  try {
+    const newKey = generateApiKey();
+    await supabase.from('websites').update({ api_key: newKey }).eq('id', req.params.id);
+
+    await supabase.from('audit_logs').insert({
+      website_id: req.params.id,
+      admin_user: req.user.username,
+      action: 'api_key_regenerated',
+      target: req.params.id,
+      ip_address: req.ip,
+    });
+
+    res.json({ api_key: newKey });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to regenerate key' });
+  }
+});
+
+// GET /api/websites/:id/snippet — SDK snippet
+router.get('/:id/snippet', async (req, res) => {
+  try {
+    const { data: website } = await supabase
+      .from('websites')
+      .select('api_key, domain, name')
+      .eq('id', req.params.id)
+      .single();
+
+    if (!website) return res.status(404).json({ error: 'Website not found' });
+
+    const apiUrl = process.env.API_URL || 'https://your-api.onrender.com';
+    const snippet = `<!-- Drishti Kavach SDK — दृष्टि कवच -->
+<script>
+(function(){
+  const DK = { apiKey: '${website.api_key}', api: '${apiUrl}/api/sdk' };
+  function send(type, data) {
+    navigator.sendBeacon(DK.api + '/log',
+      JSON.stringify({ event_type: type, page_url: location.href, event_data: data, referrer: document.referrer }));
+  }
+  // Track page view
+  send('page_view', { title: document.title });
+  // Track security events
+  window.__dk_report = (type, level, payload) => fetch(DK.api + '/security', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': DK.apiKey },
+    body: JSON.stringify({ type, level, payload, url: location.href })
+  });
+})();
+</script>`;
+
+    res.json({ snippet });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate snippet' });
+  }
+});
+
+// GET /api/websites/:id/stats
+router.get('/:id/stats', async (req, res) => {
+  try {
+    const websiteId = req.params.id;
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const [
+      { count: events },
+      { count: threats },
+      { count: blocked },
+    ] = await Promise.all([
+      supabase.from('events').select('id', { count: 'exact', head: true }).eq('website_id', websiteId).gte('timestamp', since24h),
+      supabase.from('security_events').select('id', { count: 'exact', head: true }).eq('website_id', websiteId).gte('created_at', since24h),
+      supabase.from('ip_block_list').select('id', { count: 'exact', head: true }).eq('website_id', websiteId).eq('is_active', true),
+    ]);
+
+    res.json({ events_24h: events, threats_24h: threats, blocked_ips: blocked });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+module.exports = router;
