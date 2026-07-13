@@ -17,6 +17,10 @@ router.post('/chat', async (req, res) => {
     const { question, website_id, session_id } = req.body;
     if (!question) return res.status(400).json({ error: 'Question required' });
 
+    console.log('[AI Chat] User ID:', req.user?.id);
+    console.log('[AI Chat] Website ID:', website_id);
+    console.log('[AI Chat] Question:', question?.substring(0, 50) + '...');
+
     const result = await aiService.chat(
       req.user.id,
       website_id,
@@ -26,6 +30,7 @@ router.post('/chat', async (req, res) => {
 
     res.json(result);
   } catch (err) {
+    console.error('[AI Chat Error]', err.message);
     res.status(500).json({ error: 'AI service error' });
   }
 });
