@@ -232,6 +232,8 @@ async function callDeepSeek(userMessage) {
     return null;
   }
   
+  console.log('[Drishti AI] Calling API with key:', apiKey.substring(0, 10) + '...');
+  
   try {
     const res = await axios.post(
       `${DEEPSEEK_URL}/v1/chat/completions`,
@@ -252,9 +254,19 @@ async function callDeepSeek(userMessage) {
         timeout: 15000,
       }
     );
+    
+    console.log('[Drishti AI] API response received, choices:', res.data.choices?.length);
+    
+    if (!res.data.choices || res.data.choices.length === 0) {
+      console.error('[Drishti AI] No choices in response');
+      return null;
+    }
+    
     return res.data.choices[0].message.content;
   } catch (err) {
     console.error('[Drishti AI API Error]', err.message);
+    console.error('[Drishti AI API Response Data]', err.response?.data);
+    console.error('[Drishti AI API Response Status]', err.response?.status);
     // Try next key if available
     return null;
   }
