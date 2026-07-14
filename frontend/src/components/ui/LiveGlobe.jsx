@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
 import { useSocket } from '../../context/SocketContext';
+import LiveMap from './LiveMap';
 
 // Pre-seeded threat arcs for demo (lat/lng of source → Mumbai server)
 const INITIAL_ARCS = [
@@ -19,10 +20,16 @@ const INITIAL_POINTS = INITIAL_ARCS.map(a => ({
   label: a.label,
 }));
 
+// View mode options
+const VIEW_MODES = {
+  globe: { name: 'Globe' },
+  map:   { name: 'Map' },
+};
+
 // Map style options
 const MAP_STYLES = {
   'dark': {
-    name: 'Dark NASA',
+    name: 'Dark',
     globeImageUrl: 'https://unpkg.com/three-globe/example/img/earth-dark.jpg',
     bumpImageUrl: 'https://unpkg.com/three-globe/example/img/earth-topology.png',
     atmosphereColor: '#00d4ff',
@@ -33,17 +40,17 @@ const MAP_STYLES = {
     bumpImageUrl: null,
     atmosphereColor: '#4488ff',
   },
-  'night': {
-    name: 'Night Lights',
-    globeImageUrl: 'https://unpkg.com/three-globe/example/img/earth-night.jpg',
-    bumpImageUrl: null,
-    atmosphereColor: '#ff9933',
-  },
   'satellite': {
-    name: 'Satellite',
+    name: 'Satellite Plain',
     globeImageUrl: 'https://unpkg.com/three-globe/example/img/earth-day.jpg',
     bumpImageUrl: 'https://unpkg.com/three-globe/example/img/earth-topology.png',
     atmosphereColor: '#88ccff',
+  },
+  'light': {
+    name: 'Light',
+    globeImageUrl: 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+    bumpImageUrl: 'https://unpkg.com/three-globe/example/img/earth-topology.png',
+    atmosphereColor: '#4488ff',
   },
 };
 
@@ -51,6 +58,7 @@ export default function LiveGlobe() {
   const globeRef = useRef();
   const [arcsData, setArcsData] = useState(INITIAL_ARCS);
   const [pointsData, setPointsData] = useState(INITIAL_POINTS);
+  const [viewMode, setViewMode] = useState('globe');
   const [mapStyle, setMapStyle] = useState('dark');
   const { lastIncident, connectionStatus } = useSocket();
 
@@ -111,22 +119,42 @@ export default function LiveGlobe() {
         </span>
       </div>
 
-      {/* ── MAP STYLE SELECTOR ── */}
+      {/* ── VIEW MODE & MAP STYLE SELECTOR ── */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
-        <div className="flex items-center gap-1 bg-navy-900/80 backdrop-blur-sm border border-royal-700/30 rounded-lg p-1">
-          {Object.entries(MAP_STYLES).map(([key, style]) => (
-            <button
-              key={key}
-              onClick={() => setMapStyle(key)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                mapStyle === key
-                  ? 'bg-gold-500/20 text-gold-400 border border-gold-500/30'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {style.name}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 bg-navy-900/80 backdrop-blur-sm border border-royal-700/30 rounded-lg p-1">
+          {/* View Mode */}
+          <div className="flex items-center gap-1 border-r border-royal-700/30 pr-2">
+            {Object.entries(VIEW_MODES).map(([key, mode]) => (
+              <button
+                key={key}
+                onClick={() => setViewMode(key)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  viewMode === key
+                    ? 'bg-gold-500/20 text-gold-400 border border-gold-500/30'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {mode.name}
+              </button>
+            ))}
+          </div>
+          
+          {/* Map Styles */}
+          <div className="flex items-center gap-1 pl-1">
+            {Object.entries(MAP_STYLES).map(([key, style]) => (
+              <button
+                key={key}
+                onClick={() => setMapStyle(key)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  mapStyle === key
+                    ? 'bg-gold-500/20 text-gold-400 border border-gold-500/30'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {style.name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -146,44 +174,46 @@ export default function LiveGlobe() {
         ))}
       </div>
 
-      {/* ── GLOBE ── */}
+      {/* ── GLOBE OR MAP ── */}
       <div className="absolute inset-0 flex items-center justify-center cursor-grab active:cursor-grabbing">
-        <Globe
-          ref={globeRef}
-          width={undefined}
-          height={undefined}
-          backgroundColor="rgba(0,0,0,0)"
-          globeImageUrl={currentStyle.globeImageUrl}
-          bumpImageUrl={currentStyle.bumpImageUrl}
-          atmosphereColor={currentStyle.atmosphereColor}
-          atmosphereAltitude={0.15}
-          arcsData={arcsData}
-          arcColor="color"
-          arcDashLength={0.4}
-          arcDashGap={0.15}
-          arcDashAnimateTime={2000}
-          arcsTransitionDuration={800}
-          arcStroke={0.6}
-          arcAltitude={0.3}
-          arcLabel="label"
-          pointsData={pointsData}
-          pointColor="color"
-          pointAltitude={0.01}
-          pointRadius="size"
-          pointsMerge={false}
-          pointLabel="label"
-          customLayerData={[{ lat: SERVER.lat, lng: SERVER.lng }]}
-          customThreeObject={() => {
-            const { SphereGeometry, MeshBasicMaterial, Mesh } = window.THREE || {};
-            if (!SphereGeometry) return null;
-            const geo = new SphereGeometry(0.5, 8, 8);
-            const mat = new MeshBasicMaterial({ color: 0x00ff88 });
-            return new Mesh(geo, mat);
-          }}
-          customThreeObjectUpdate={(obj, d) => {
-            // no-op required by API
-          }}
-        />
+        {viewMode === 'globe' ? (
+          <Globe
+            ref={globeRef}
+            width={undefined}
+            height={undefined}
+            backgroundColor="rgba(0,0,0,0)"
+            globeImageUrl={currentStyle.globeImageUrl}
+            bumpImageUrl={currentStyle.bumpImageUrl}
+            atmosphereColor={currentStyle.atmosphereColor}
+            atmosphereAltitude={0.15}
+            arcsData={arcsData}
+            arcColor="color"
+            arcDashLength={0.4}
+            arcDashGap={0.15}
+            arcDashAnimateTime={2000}
+            arcsTransitionDuration={800}
+            arcStroke={0.6}
+            arcAltitude={0.3}
+            arcLabel="label"
+            pointsData={pointsData}
+            pointColor="color"
+            pointAltitude={0.01}
+            pointRadius="size"
+            pointsMerge={false}
+            pointLabel="label"
+            customLayerData={[{ lat: SERVER.lat, lng: SERVER.lng }]}
+            customThreeObject={() => {
+              const { SphereGeometry, MeshBasicMaterial, Mesh } = window.THREE || {};
+              if (!SphereGeometry) return null;
+              const geo = new SphereGeometry(0.5, 8, 8);
+              const mat = new MeshBasicMaterial({ color: 0x00ff88 });
+              return new Mesh(geo, mat);
+            }}
+            customThreeObjectUpdate={(obj, d) => {}}
+          />
+        ) : (
+          <LiveMap arcsData={arcsData} mapStyle={mapStyle} />
+        )}
       </div>
 
       {/* ── BOTTOM LEGEND ── */}
