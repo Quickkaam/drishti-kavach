@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
 import { useSocket } from '../../context/SocketContext';
-import LiveMap from './LiveMap';
-import LiveMap from './LiveMap';
+import GoogleMap from './GoogleMap';
 
 // Pre-seeded threat arcs for demo (lat/lng of source → Mumbai server)
 const INITIAL_ARCS = [
@@ -213,7 +212,7 @@ export default function LiveGlobe() {
             customThreeObjectUpdate={(obj, d) => {}}
           />
         ) : (
-          <LiveMap arcsData={arcsData} mapStyle={mapStyle} />
+          <GoogleMap arcsData={arcsData} mapStyle={mapStyle} />
         )}
       </div>
 
