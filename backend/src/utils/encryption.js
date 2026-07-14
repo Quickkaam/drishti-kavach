@@ -49,7 +49,7 @@ function decryptData(encryptedData, options = {}) {
   let decrypted = decipher.update(encryptedData.data, 'base64', 'utf8');
   decrypted += decipher.final('utf8');
   
-  return Buffer.from(decrypted, 'utf8');
+  return decrypted;
 }
 
 function encryptString(data) {

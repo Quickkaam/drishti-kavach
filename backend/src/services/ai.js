@@ -26,7 +26,7 @@ if (AI_PROVIDER === 'groq') {
 const API_KEYS = [
   process.env.DEEPSEEK_API_KEY,
   process.env.DEEPSEEK_API_KEY_BACKUP,
-].filter(key => key && key.trim() !== '');
+].filter(key => key && key.trim() !== '' && key.startsWith('gsk_'));
 
 console.log('[AI Service] Provider:', AI_PROVIDER);
 console.log('[AI Service] URL:', DEEPSEEK_URL);
@@ -225,51 +225,53 @@ Write a professional 3-4 sentence summary with: overall status, key findings, an
 }
 
 async function callDeepSeek(userMessage) {
-  const apiKey = getNextApiKey();
-  
-  if (!apiKey) {
+  if (API_KEYS.length === 0) {
     console.error('[Drishti AI] No API key configured');
     return null;
   }
   
-  console.log('[Drishti AI] Calling API with key:', apiKey.substring(0, 10) + '...');
-  
-  try {
-    const res = await axios.post(
-      `${DEEPSEEK_URL}/v1/chat/completions`,
-      {
-        model: MODEL,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userMessage },
-        ],
-        max_tokens: 500,
-        temperature: 0.3,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
+  // Attempt to call the API, failing over to next keys if errors occur
+  for (let attempt = 0; attempt < API_KEYS.length; attempt++) {
+    const apiKey = getNextApiKey();
+    console.log('[Drishti AI] Calling API with key:', apiKey.substring(0, 10) + '...');
+    
+    try {
+      const res = await axios.post(
+        `${DEEPSEEK_URL}/v1/chat/completions`,
+        {
+          model: MODEL,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userMessage },
+          ],
+          max_tokens: 500,
+          temperature: 0.3,
         },
-        timeout: 15000,
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 15000,
+        }
+      );
+      
+      console.log('[Drishti AI] API response received, choices:', res.data.choices?.length);
+      
+      if (res.data.choices && res.data.choices.length > 0) {
+        return res.data.choices[0].message.content;
       }
-    );
-    
-    console.log('[Drishti AI] API response received, choices:', res.data.choices?.length);
-    
-    if (!res.data.choices || res.data.choices.length === 0) {
-      console.error('[Drishti AI] No choices in response');
-      return null;
+    } catch (err) {
+      console.error(`[Drishti AI API Error] Attempt with key ${apiKey.substring(0, 10)}... failed:`, err.message);
+      if (err.response?.data) {
+        console.error('[Drishti AI API Response Data]', err.response.data);
+      }
+      // If we have more keys left, loop will try the next one
     }
-    
-    return res.data.choices[0].message.content;
-  } catch (err) {
-    console.error('[Drishti AI API Error]', err.message);
-    console.error('[Drishti AI API Response Data]', err.response?.data);
-    console.error('[Drishti AI API Response Status]', err.response?.status);
-    // Try next key if available
-    return null;
   }
+  
+  console.error('[Drishti AI] All configured API keys failed.');
+  return null;
 }
 
 async function getAssistantSettings() {
