@@ -95,35 +95,37 @@ export default function DrishtiAI() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+      <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${
-              msg.role === 'user' ? 'bg-royal-800' : 'bg-gold-400/20 border border-gold-400/30'
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 ${
+              msg.role === 'user' 
+                ? 'bg-gradient-to-br from-royal-600 to-royal-800 shadow-lg shadow-royal-500/20' 
+                : 'bg-gradient-to-br from-gold-500/30 to-gold-600/10 border border-gold-400/40 shadow-lg shadow-gold-500/10'
             }`}>
               {msg.role === 'user' ? '👤' : '🛡️'}
             </div>
-            <div className={`max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
-              <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+            <div className={`max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-1.5`}>
+              <div className={`px-5 py-4 rounded-2xl text-sm leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-royal-800/60 text-slate-200 rounded-tr-sm'
-                  : 'bg-navy-800 border border-royal-800/40 text-slate-300 rounded-tl-sm'
-              }`}>
-                {msg.content}
+                  ? 'bg-gradient-to-br from-royal-700/80 to-royal-800/60 text-white rounded-tr-md shadow-lg shadow-royal-500/10 border border-royal-600/30'
+                  : 'bg-gradient-to-br from-navy-700 to-navy-800 border border-royal-700/40 text-slate-200 rounded-tl-md shadow-lg'
+              }`} style={{ fontFamily: "'Inter', sans-serif" }}>
+                <div className="whitespace-pre-wrap break-words">{msg.content}</div>
               </div>
-              <span className="text-xs text-slate-600">{msg.time}</span>
+              <span className="text-[10px] text-slate-500 font-medium tracking-wide">{msg.time}</span>
             </div>
           </div>
         ))}
 
         {loading && (
           <div className="flex gap-3">
-            <div className="w-7 h-7 rounded-full bg-gold-400/20 border border-gold-400/30 flex items-center justify-center text-sm">🛡️</div>
-            <div className="px-4 py-3 bg-navy-800 border border-royal-800/40 rounded-2xl rounded-tl-sm">
-              <div className="flex gap-1">
-                {[0.1, 0.2, 0.3].map(d => (
-                  <span key={d} className="w-2 h-2 rounded-full bg-gold-400/60 animate-bounce"
-                        style={{ animationDelay: `${d}s` }}></span>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-500/30 to-gold-600/10 border border-gold-400/40 flex items-center justify-center text-base shadow-lg shadow-gold-500/10">🛡️</div>
+            <div className="px-5 py-4 bg-gradient-to-br from-navy-700 to-navy-800 border border-royal-700/40 rounded-2xl rounded-tl-md shadow-lg">
+              <div className="flex gap-1.5 items-center">
+                {[0, 0.15, 0.3].map((d, i) => (
+                  <span key={i} className="w-2 h-2 rounded-full bg-gold-400 animate-bounce"
+                        style={{ animationDelay: `${d}s`, animationDuration: '0.6s' }}></span>
                 ))}
               </div>
             </div>
@@ -133,20 +135,48 @@ export default function DrishtiAI() {
       </div>
 
       {/* Input */}
-      <div className="flex gap-3 mt-4 flex-shrink-0">
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-          placeholder="Ask Drishti AI anything about your security..."
-          className="dk-input flex-1"
-          disabled={loading}
-        />
-        <button onClick={() => sendMessage()} disabled={loading || !input.trim()}
-                className="dk-btn-primary px-5 disabled:opacity-50">
+      <div className="flex gap-3 mt-4 pt-4 flex-shrink-0 border-t border-royal-800/30">
+        <div className="flex-1 relative">
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !loading && sendMessage()}
+            placeholder="Ask Drishti AI about security threats, analysis, or recommendations..."
+            className="w-full px-4 py-3.5 bg-navy-800/80 border border-royal-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-gold-500/50 focus:ring-2 focus:ring-gold-500/20 transition-all duration-200 text-sm"
+            style={{ fontFamily: "'Inter', sans-serif" }}
+            disabled={loading}
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs">
+            Press Enter to send
+          </div>
+        </div>
+        <button 
+          onClick={() => sendMessage()} 
+          disabled={loading || !input.trim()}
+          className="px-6 py-3.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-400 hover:to-gold-500 text-navy-900 font-semibold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-gold-500/20 hover:shadow-gold-500/30 text-sm"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
           Send
         </button>
       </div>
+      
+      {/* Custom scrollbar styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.1);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(245, 176, 65, 0.3);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(245, 176, 65, 0.5);
+        }
+      `}</style>
     </div>
   );
 }
