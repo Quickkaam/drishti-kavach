@@ -19,10 +19,39 @@ const INITIAL_POINTS = INITIAL_ARCS.map(a => ({
   label: a.label,
 }));
 
+// Map style options
+const MAP_STYLES = {
+  'dark': {
+    name: 'Dark NASA',
+    globeImageUrl: 'https://unpkg.com/three-globe/example/img/earth-dark.jpg',
+    bumpImageUrl: 'https://unpkg.com/three-globe/example/img/earth-topology.png',
+    atmosphereColor: '#00d4ff',
+  },
+  'blue': {
+    name: 'Blue Marble',
+    globeImageUrl: 'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+    bumpImageUrl: null,
+    atmosphereColor: '#4488ff',
+  },
+  'night': {
+    name: 'Night Lights',
+    globeImageUrl: 'https://unpkg.com/three-globe/example/img/earth-night.jpg',
+    bumpImageUrl: null,
+    atmosphereColor: '#ff9933',
+  },
+  'satellite': {
+    name: 'Satellite',
+    globeImageUrl: 'https://unpkg.com/three-globe/example/img/earth-day.jpg',
+    bumpImageUrl: 'https://unpkg.com/three-globe/example/img/earth-topology.png',
+    atmosphereColor: '#88ccff',
+  },
+};
+
 export default function LiveGlobe() {
   const globeRef = useRef();
   const [arcsData, setArcsData] = useState(INITIAL_ARCS);
   const [pointsData, setPointsData] = useState(INITIAL_POINTS);
+  const [mapStyle, setMapStyle] = useState('dark');
   const { lastIncident, connectionStatus } = useSocket();
 
   // Server location — Mumbai
@@ -67,6 +96,8 @@ export default function LiveGlobe() {
     medium: arcsData.filter(a => a.severity === 'medium').length,
   };
 
+  const currentStyle = MAP_STYLES[mapStyle];
+
   return (
     <div
       className="w-full h-full relative overflow-hidden flex items-center justify-center"
@@ -78,6 +109,25 @@ export default function LiveGlobe() {
         <span className="font-orbitron text-xs text-[#00d4ff] tracking-[0.2em] font-bold uppercase">
           Global Shield Monitor
         </span>
+      </div>
+
+      {/* ── MAP STYLE SELECTOR ── */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+        <div className="flex items-center gap-1 bg-navy-900/80 backdrop-blur-sm border border-royal-700/30 rounded-lg p-1">
+          {Object.entries(MAP_STYLES).map(([key, style]) => (
+            <button
+              key={key}
+              onClick={() => setMapStyle(key)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                mapStyle === key
+                  ? 'bg-gold-500/20 text-gold-400 border border-gold-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {style.name}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── ATTACK COUNTER BADGES ── */}
@@ -103,13 +153,10 @@ export default function LiveGlobe() {
           width={undefined}
           height={undefined}
           backgroundColor="rgba(0,0,0,0)"
-          // Proper world map texture (dark NASA blue marble)
-          globeImageUrl="https://unpkg.com/three-globe/example/img/earth-dark.jpg"
-          bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png"
-          // Night-side atmosphere glow
-          atmosphereColor="#00d4ff"
+          globeImageUrl={currentStyle.globeImageUrl}
+          bumpImageUrl={currentStyle.bumpImageUrl}
+          atmosphereColor={currentStyle.atmosphereColor}
           atmosphereAltitude={0.15}
-          // Attack arcs
           arcsData={arcsData}
           arcColor="color"
           arcDashLength={0.4}
@@ -119,14 +166,12 @@ export default function LiveGlobe() {
           arcStroke={0.6}
           arcAltitude={0.3}
           arcLabel="label"
-          // Source IP pins
           pointsData={pointsData}
           pointColor="color"
           pointAltitude={0.01}
           pointRadius="size"
           pointsMerge={false}
           pointLabel="label"
-          // Server pin (target)
           customLayerData={[{ lat: SERVER.lat, lng: SERVER.lng }]}
           customThreeObject={() => {
             const { SphereGeometry, MeshBasicMaterial, Mesh } = window.THREE || {};

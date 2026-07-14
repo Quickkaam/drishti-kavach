@@ -20,93 +20,125 @@ const QUICK_PROMPTS = [
 const formatResponse = (content) => {
   // Check if response is JSON
   if (content.trim().startsWith('```') || content.includes('```')) {
-    // Extract JSON from code block
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[1].trim());
-        return { type: 'json', data: parsed, raw: content };
+        return { type: 'json', data: parsed };
       } catch {
         return { type: 'text', data: content };
       }
     }
   }
   
-  // Try to parse as JSON directly
   try {
     const parsed = JSON.parse(content);
-    return { type: 'json', data: parsed, raw: content };
+    return { type: 'json', data: parsed };
   } catch {
     return { type: 'text', data: content };
   }
 };
 
-// Component to render formatted AI response
+// Component to render formatted AI response - Clean, no JSON structure
 const ResponseContent = ({ content }) => {
   const formatted = formatResponse(content);
   
   if (formatted.type === 'json') {
     const data = formatted.data;
+    
     return (
-      <div className="space-y-3">
-        {/* Main response */}
-        {data.response && (
+      <div className="space-y-4">
+        {/* Main Message */}
+        {data.message && (
+          <p className="text-white text-base leading-relaxed">{data.message}</p>
+        )}
+        
+        {/* Response text */}
+        {data.response && !data.message && (
           <p className="text-white text-base leading-relaxed">{data.response}</p>
         )}
         
-        {/* Threat assessment */}
-        {data.threat_assessment && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-            <span className="text-red-400 font-semibold text-xs uppercase tracking-wider">Threat Assessment</span>
-            <p className="text-slate-200 text-sm mt-1">{data.threat_assessment}</p>
+        {/* Threat Assessment Section */}
+        {(data.threat_assessment || data.threat_level) && (
+          <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-red-400 text-lg">⚠️</span>
+              <span className="text-red-400 font-semibold text-sm uppercase tracking-wider">Threat Assessment</span>
+            </div>
+            <p className="text-slate-200 text-base">
+              {typeof data.threat_assessment === 'object' 
+                ? data.threat_assessment.summary || JSON.stringify(data.threat_assessment)
+                : data.threat_assessment || data.threat_level}
+            </p>
           </div>
         )}
         
-        {/* Severity rating */}
-        {data.severity_rating !== undefined && data.severity_rating !== null && (
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400 text-xs">Severity:</span>
-            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-              data.severity_rating === 'Low' || data.severity_rating === 0 ? 'bg-green-500/20 text-green-400' :
-              data.severity_rating === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
-              data.severity_rating === 'High' ? 'bg-orange-500/20 text-orange-400' :
-              'bg-red-500/20 text-red-400'
+        {/* Risk Level / Severity */}
+        {(data.severity_rating !== undefined && data.severity_rating !== null) && (
+          <div className="flex items-center gap-3">
+            <span className="text-slate-400 text-sm font-medium">Risk Level:</span>
+            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+              data.severity_rating === 'Low' || data.severity_rating === 0 ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+              data.severity_rating === 'Medium' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+              data.severity_rating === 'High' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+              'bg-red-500/20 text-red-400 border border-red-500/30'
             }`}>
               {data.severity_rating}
             </span>
           </div>
         )}
         
-        {/* Recommendation */}
-        {data.recommendation && (
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-            <span className="text-blue-400 font-semibold text-xs uppercase tracking-wider">Recommendation</span>
-            <p className="text-slate-200 text-sm mt-1">{data.recommendation}</p>
+        {/* Recommended Action */}
+        {(data.recommendation || data.recommended_action) && (
+          <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-blue-400 text-lg">💡</span>
+              <span className="text-blue-400 font-semibold text-sm uppercase tracking-wider">Recommended Action</span>
+            </div>
+            <p className="text-slate-200 text-base">{data.recommendation || data.recommended_action}</p>
           </div>
         )}
         
-        {/* Sanskrit Motto - Make it prominent */}
+        {/* Compliance Status */}
+        {data.compliance_status && (
+          <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-purple-400 text-lg">📋</span>
+              <span className="text-purple-400 font-semibold text-sm uppercase tracking-wider">Compliance Status</span>
+            </div>
+            <p className="text-slate-200 text-base">{data.compliance_status}</p>
+          </div>
+        )}
+        
+        {/* Assessment */}
+        {data.assessment && (
+          <div className="bg-navy-700/50 border border-slate-600/30 rounded-lg p-4">
+            <span className="text-slate-400 font-semibold text-sm uppercase tracking-wider">Assessment</span>
+            <p className="text-slate-200 text-base mt-1">{data.assessment}</p>
+          </div>
+        )}
+        
+        {/* Additional Info */}
+        {data.additional_info && (
+          <p className="text-slate-400 text-sm italic border-l-2 border-slate-600 pl-3">{data.additional_info}</p>
+        )}
+        
+        {/* Sanskrit Motto - Prominent display */}
         {data.motto && (
-          <div className="mt-4 pt-3 border-t border-gold-500/20">
-            <p className="text-gold-400 text-lg font-medium tracking-wide text-center" 
+          <div className="mt-4 pt-4 border-t border-gold-500/30 text-center">
+            <p className="text-gold-400 text-xl font-medium tracking-wide" 
                style={{ fontFamily: "'Noto Sans Devanagari', 'Arial Unicode MS', sans-serif" }}>
               {data.motto}
             </p>
           </div>
         )}
         
-        {/* Additional info */}
-        {data.additional_info && (
-          <p className="text-slate-400 text-sm italic">{data.additional_info}</p>
+        {/* Security Context */}
+        {data.security_context && (
+          <div className="text-slate-500 text-xs mt-2">
+            Events in last 24h: {data.security_context.security_events_last_24h || 0}
+          </div>
         )}
-        
-        {/* Raw JSON toggle for debugging */}
-        <details className="mt-2">
-          <summary className="text-slate-500 text-xs cursor-pointer hover:text-slate-400">View raw JSON</summary>
-          <pre className="mt-2 p-2 bg-navy-900/50 rounded text-xs text-slate-400 overflow-x-auto">
-            {JSON.stringify(data, null, 2)}
-          </pre>
-        </details>
       </div>
     );
   }
@@ -173,9 +205,8 @@ export default function DrishtiAI() {
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-4 flex-shrink-0">
-        <div className="w-12 h-12 rounded-full flex items-center justify-center border border-gold-400/40 overflow-hidden"
-             style={{ background: 'radial-gradient(circle, rgba(245,176,65,0.2) 0%, transparent 70%)' }}>
-          <img src={logo} alt="Drishti AI" className="w-full h-full object-cover" />
+        <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
+          <img src={logo} alt="Drishti AI" className="w-full h-full object-contain" />
         </div>
         <div>
           <h1 className="text-xl font-bold text-white">Drishti AI</h1>
@@ -201,13 +232,16 @@ export default function DrishtiAI() {
       <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 ${
-              msg.role === 'user' 
-                ? 'bg-gradient-to-br from-royal-600 to-royal-800 shadow-lg shadow-royal-500/20' 
-                : 'bg-gradient-to-br from-gold-500/30 to-gold-600/10 border border-gold-400/40 shadow-lg shadow-gold-500/10'
-            }`}>
-              {msg.role === 'user' ? '👤' : '🛡️'}
-            </div>
+            {/* Avatar - Logo for AI, Emoji for user */}
+            {msg.role === 'user' ? (
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 bg-gradient-to-br from-royal-600 to-royal-800 shadow-lg shadow-royal-500/20">
+                👤
+              </div>
+            ) : (
+              <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+                <img src={logo} alt="Drishti AI" className="w-full h-full object-contain" />
+              </div>
+            )}
             <div className={`max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-1.5`}>
               <div className={`px-5 py-4 rounded-2xl text-sm leading-relaxed ${
                 msg.role === 'user'
@@ -227,7 +261,9 @@ export default function DrishtiAI() {
 
         {loading && (
           <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-500/30 to-gold-600/10 border border-gold-400/40 flex items-center justify-center text-base shadow-lg shadow-gold-500/10">🛡️</div>
+            <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+              <img src={logo} alt="Drishti AI" className="w-full h-full object-contain" />
+            </div>
             <div className="px-5 py-4 bg-gradient-to-br from-navy-700 to-navy-800 border border-royal-700/40 rounded-2xl rounded-tl-md shadow-lg">
               <div className="flex gap-1.5 items-center">
                 {[0, 0.15, 0.3].map((d, i) => (
@@ -249,11 +285,11 @@ export default function DrishtiAI() {
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !loading && sendMessage()}
             placeholder="Ask Drishti AI about security threats, analysis, or recommendations..."
-            className="w-full px-4 py-3.5 bg-navy-800/80 border border-royal-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-gold-500/50 focus:ring-2 focus:ring-gold-500/20 transition-all duration-200 text-sm"
+            className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-black placeholder-gray-500 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all duration-200 text-sm"
             style={{ fontFamily: "'Inter', sans-serif" }}
             disabled={loading}
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
             Press Enter to send
           </div>
         </div>

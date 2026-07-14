@@ -18,7 +18,7 @@ const NAV = [
   { path: '/ip',         icon: '⬢', label: 'IP MANAGEMENT' },
   { path: '/incidents',  icon: '⚠', label: 'INCIDENTS' },
   { path: '/forms',      icon: '◆', label: 'FORM INTEL' },
-  { path: '/ai',         icon: '✦', label: 'DRISHTI AI' },
+  { path: '/ai',         icon: '🤖', label: 'DRISHTI AI', isLogo: true },
   { path: '/websites',   icon: '⬣', label: 'WEBSITES' },
   { path: '/reports',    icon: '▣', label: 'REPORTS' },
   { path: '/users',      icon: '◎', label: 'USERS',       adminOnly: true },
