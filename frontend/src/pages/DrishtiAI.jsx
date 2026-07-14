@@ -16,6 +16,109 @@ const QUICK_PROMPTS = [
   "Show critical events this week",
 ];
 
+// Helper function to format AI response
+const formatResponse = (content) => {
+  // Check if response is JSON
+  if (content.trim().startsWith('```') || content.includes('```')) {
+    // Extract JSON from code block
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1].trim());
+        return { type: 'json', data: parsed, raw: content };
+      } catch {
+        return { type: 'text', data: content };
+      }
+    }
+  }
+  
+  // Try to parse as JSON directly
+  try {
+    const parsed = JSON.parse(content);
+    return { type: 'json', data: parsed, raw: content };
+  } catch {
+    return { type: 'text', data: content };
+  }
+};
+
+// Component to render formatted AI response
+const ResponseContent = ({ content }) => {
+  const formatted = formatResponse(content);
+  
+  if (formatted.type === 'json') {
+    const data = formatted.data;
+    return (
+      <div className="space-y-3">
+        {/* Main response */}
+        {data.response && (
+          <p className="text-white text-base leading-relaxed">{data.response}</p>
+        )}
+        
+        {/* Threat assessment */}
+        {data.threat_assessment && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+            <span className="text-red-400 font-semibold text-xs uppercase tracking-wider">Threat Assessment</span>
+            <p className="text-slate-200 text-sm mt-1">{data.threat_assessment}</p>
+          </div>
+        )}
+        
+        {/* Severity rating */}
+        {data.severity_rating !== undefined && data.severity_rating !== null && (
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-xs">Severity:</span>
+            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+              data.severity_rating === 'Low' || data.severity_rating === 0 ? 'bg-green-500/20 text-green-400' :
+              data.severity_rating === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
+              data.severity_rating === 'High' ? 'bg-orange-500/20 text-orange-400' :
+              'bg-red-500/20 text-red-400'
+            }`}>
+              {data.severity_rating}
+            </span>
+          </div>
+        )}
+        
+        {/* Recommendation */}
+        {data.recommendation && (
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+            <span className="text-blue-400 font-semibold text-xs uppercase tracking-wider">Recommendation</span>
+            <p className="text-slate-200 text-sm mt-1">{data.recommendation}</p>
+          </div>
+        )}
+        
+        {/* Sanskrit Motto - Make it prominent */}
+        {data.motto && (
+          <div className="mt-4 pt-3 border-t border-gold-500/20">
+            <p className="text-gold-400 text-lg font-medium tracking-wide text-center" 
+               style={{ fontFamily: "'Noto Sans Devanagari', 'Arial Unicode MS', sans-serif" }}>
+              {data.motto}
+            </p>
+          </div>
+        )}
+        
+        {/* Additional info */}
+        {data.additional_info && (
+          <p className="text-slate-400 text-sm italic">{data.additional_info}</p>
+        )}
+        
+        {/* Raw JSON toggle for debugging */}
+        <details className="mt-2">
+          <summary className="text-slate-500 text-xs cursor-pointer hover:text-slate-400">View raw JSON</summary>
+          <pre className="mt-2 p-2 bg-navy-900/50 rounded text-xs text-slate-400 overflow-x-auto">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </details>
+      </div>
+    );
+  }
+  
+  // Regular text response
+  return (
+    <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-200">
+      {content}
+    </div>
+  );
+};
+
 export default function DrishtiAI() {
   const [messages, setMessages] = useState([
     {
@@ -76,7 +179,7 @@ export default function DrishtiAI() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-white">Drishti AI</h1>
-          <p className="text-slate-500 text-xs">Autonomous Security Intelligence • Powered by DeepSeek</p>
+          <p className="text-slate-500 text-xs">Autonomous Security Intelligence • Powered by Groq</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5 text-xs text-green-400 bg-green-900/20 border border-green-800/30 px-3 py-1 rounded-full">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
@@ -111,7 +214,11 @@ export default function DrishtiAI() {
                   ? 'bg-gradient-to-br from-royal-700/80 to-royal-800/60 text-white rounded-tr-md shadow-lg shadow-royal-500/10 border border-royal-600/30'
                   : 'bg-gradient-to-br from-navy-700 to-navy-800 border border-royal-700/40 text-slate-200 rounded-tl-md shadow-lg'
               }`} style={{ fontFamily: "'Inter', sans-serif" }}>
-                <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                {msg.role === 'assistant' ? (
+                  <ResponseContent content={msg.content} />
+                ) : (
+                  <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                )}
               </div>
               <span className="text-[10px] text-slate-500 font-medium tracking-wide">{msg.time}</span>
             </div>
