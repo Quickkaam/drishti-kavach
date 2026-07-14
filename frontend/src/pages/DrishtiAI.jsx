@@ -42,7 +42,11 @@ export default function DrishtiAI() {
     setLoading(true);
 
     try {
-      const { data } = await api.post('/ai/chat', { question, session_id: sessionId });
+      const { data } = await api.post('/ai/chat', { 
+        question, 
+        website_id: 1,
+        session_id: sessionId 
+      });
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: data.response || 'I encountered an issue. Please try again.',
