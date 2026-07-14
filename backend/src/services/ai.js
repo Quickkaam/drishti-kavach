@@ -15,10 +15,10 @@ let DEEPSEEK_URL;
 let MODEL;
 
 if (AI_PROVIDER === 'groq') {
-  DEEPSEEK_URL = 'https://api.groq.com/openai/v1';
+  DEEPSEEK_URL = 'https://api.groq.com/openai';
   MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 } else {
-  DEEPSEEK_URL = 'https://openrouter.ai/api/v1';
+  DEEPSEEK_URL = 'https://openrouter.ai/api';
   MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
 }
 
