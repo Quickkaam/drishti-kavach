@@ -26,7 +26,7 @@ if (AI_PROVIDER === 'groq') {
 const API_KEYS = [
   process.env.DEEPSEEK_API_KEY,
   process.env.DEEPSEEK_API_KEY_BACKUP,
-].filter(key => key && key.trim() !== '' && key.startsWith('gsk_'));
+].filter(key => key && key.trim() !== '' && (key.startsWith('gsk_') || key.startsWith('sk-or-v1-')));
 
 console.log('[AI Service] Provider:', AI_PROVIDER);
 console.log('[AI Service] URL:', DEEPSEEK_URL);
