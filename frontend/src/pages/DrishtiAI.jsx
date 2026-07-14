@@ -52,10 +52,12 @@ export default function DrishtiAI() {
         content: data.response || 'I encountered an issue. Please try again.',
         time: new Date().toLocaleTimeString(),
       }]);
-    } catch {
+    } catch (error) {
+      const errorMessage = error.response?.data?.error || error.message || 'Unknown error';
+      console.error('[AI Error]', errorMessage);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '⚠️ Drishti AI is temporarily unavailable. Please check your API key configuration.',
+        content: `⚠️ Drishti AI encountered an error: ${errorMessage}. Please check backend logs.`,
         time: new Date().toLocaleTimeString(),
       }]);
     } finally {

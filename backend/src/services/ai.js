@@ -133,11 +133,17 @@ Respond with: { "threat_level": "low|medium|high|critical", "recommendation": "b
 
 // Chat interface
 async function chat(userId, websiteId, question, sessionId) {
+  console.log('[AI CHAT] Starting chat for user:', userId, 'website:', websiteId);
+  
   try {
     const apiKey = getNextApiKey();
     if (!apiKey) {
+      console.log('[AI CHAT] No API key configured');
       return { response: 'Drishti AI is not configured. Please set DEEPSEEK_API_KEY.' };
     }
+
+    console.log('[AI CHAT] Using API key:', apiKey.substring(0, 10) + '...');
+    console.log('[AI CHAT] Calling supabase...');
 
     // Fetch recent context
     const { data: recentEvents } = await supabase
@@ -147,11 +153,15 @@ async function chat(userId, websiteId, question, sessionId) {
       .order('created_at', { ascending: false })
       .limit(5);
 
+    console.log('[AI CHAT] Recent events:', recentEvents?.length || 0);
+
     const { data: stats } = await supabase
       .from('security_events')
       .select('id', { count: 'exact', head: true })
       .eq('website_id', websiteId)
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+    console.log('[AI CHAT] Stats:', stats);
 
     const contextPrompt = `Context:
 - Security events in last 24h: ${stats?.count || 0}
@@ -159,12 +169,15 @@ async function chat(userId, websiteId, question, sessionId) {
 
 User question: ${question}`;
 
+    console.log('[AI CHAT] Calling DeepSeek...');
     const response = await callDeepSeek(contextPrompt);
 
     if (!response) {
+      console.log('[AI CHAT] No response from DeepSeek');
       return { response: 'Drishti AI encountered an error. Please try again.' };
     }
 
+    console.log('[AI CHAT] Response received, saving to session...');
     // Save to session
     await supabase.from('ai_sessions').insert({
       session_id: sessionId,
@@ -174,10 +187,12 @@ User question: ${question}`;
       response,
     });
 
+    console.log('[AI CHAT] Chat completed successfully');
     return { response };
   } catch (err) {
-    console.error('[AI CHAT]', err.message);
-    return { response: 'Drishti AI encountered an error. Please try again.' };
+    console.error('[AI CHAT] Error:', err.message);
+    console.error('[AI CHAT] Error stack:', err.stack);
+    return { response: `Drishti AI encountered an error: ${err.message}` };
   }
 }
 

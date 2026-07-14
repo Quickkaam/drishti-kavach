@@ -21,6 +21,12 @@ router.post('/chat', async (req, res) => {
     console.log('[AI Chat] Website ID:', website_id);
     console.log('[AI Chat] Question:', question?.substring(0, 50) + '...');
 
+    // Validate website_id
+    if (!website_id) {
+      console.log('[AI Chat] ERROR: website_id is missing');
+      return res.status(400).json({ error: 'website_id is required' });
+    }
+
     const result = await aiService.chat(
       req.user.id,
       website_id,
@@ -28,10 +34,12 @@ router.post('/chat', async (req, res) => {
       session_id || uuidv4()
     );
 
+    console.log('[AI Chat] Response:', result?.response?.substring(0, 50) + '...');
     res.json(result);
   } catch (err) {
     console.error('[AI Chat Error]', err.message);
-    res.status(500).json({ error: 'AI service error' });
+    console.error('[AI Chat Error Stack]', err.stack);
+    res.status(500).json({ error: 'AI service error', message: err.message });
   }
 });
 
