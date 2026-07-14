@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
 import { useSocket } from '../../context/SocketContext';
 import LiveMap from './LiveMap';
+import LiveMap from './LiveMap';
 
 // Pre-seeded threat arcs for demo (lat/lng of source → Mumbai server)
 const INITIAL_ARCS = [
