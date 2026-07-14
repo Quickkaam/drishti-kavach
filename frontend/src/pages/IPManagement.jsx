@@ -30,8 +30,38 @@ export default function IPManagement() {
     try {
       const { data } = await api.get(`/ip/${lookupIp}`);
       setIntel(data.intel);
-    } catch { alert('Lookup failed'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      // Fallback to ipapi.co if backend lookup fails
+      try {
+        const response = await fetch(`https://ipapi.co/${lookupIp}/json/`);
+        const data = await response.json();
+        if (data && data.ip) {
+          setIntel({
+            ip: data.ip,
+            city: data.city,
+            region: data.region,
+            country: data.country_name,
+            country_code: data.country_code,
+            postal: data.postal,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            timezone: data.timezone,
+            utc_offset: data.utc_offset,
+            asn: data.asn,
+            org: data.org,
+            isp: data.org,
+            threat_score: 0,
+            abuse_confidence: 0,
+            total_reports: 0,
+            is_scanner: false,
+            is_vpn: false,
+            is_bot: false,
+          });
+        }
+      } catch (fallbackErr) {
+        alert('Lookup failed - IP not in database or network error');
+      }
+    } finally { setLoading(false); }
   };
 
   const blockIp = async () => {
