@@ -18,10 +18,11 @@ const NAV = [
   { path: '/ip',         icon: '⬢', label: 'IP MANAGEMENT' },
   { path: '/incidents',  icon: '⚠', label: 'INCIDENTS' },
   { path: '/forms',      icon: '◆', label: 'FORM INTEL' },
-  { path: '/ai',         icon: '🤖', label: 'DRISHTI AI', isLogo: true },
+  { path: '/ai',         icon: <img src="/drishti-kavach-logo.png" alt="AI" style={{width: '16px', height: '16px', filter: 'drop-shadow(0 0 4px rgba(0,212,255,0.8))'}} />, label: 'DRISHTI AI', isLogo: true },
   { path: '/websites',   icon: '⬣', label: 'WEBSITES' },
   { path: '/reports',    icon: '▣', label: 'REPORTS' },
   { path: '/users',      icon: '◎', label: 'USERS',       adminOnly: true },
+  { path: '/credentials',icon: '🔑', label: 'CREDENTIALS', superAdminOnly: true },
   { path: '/audit',      icon: '≡', label: 'AUDIT LOG',   adminOnly: true },
   { path: '/settings',   icon: '⚙', label: 'SETTINGS' },
 ];
@@ -256,7 +257,11 @@ export default function DashboardLayout() {
           flexDirection: 'column',
           gap: '0.25rem',
         }}>
-          {NAV.filter(n => !n.adminOnly || user?.role === 'admin').map(item => {
+          {NAV.filter(n => {
+            if (n.superAdminOnly) return user?.role === 'superadmin';
+            if (n.adminOnly) return user?.role === 'admin' || user?.role === 'superadmin';
+            return true;
+          }).map(item => {
             const path = window.location.pathname;
             const isActive = item.end ? path === item.path : path.startsWith(item.path);
             
