@@ -170,6 +170,8 @@ export default function Credentials() {
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Account</th>
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">IP Address</th>
+                    <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">IP Information</th>
                     <th className="px-4 py-3 text-xs font-medium text-red-500/70 uppercase tracking-wider text-right">Danger Zone</th>
                   </tr>
                 </thead>
@@ -195,6 +197,16 @@ export default function Credentials() {
                           {u.is_active ? 'Active' : 'Disabled'}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-mono text-slate-300 bg-slate-800/50 px-2 py-1 rounded">
+                          {u.last_ip || 'Unknown'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-slate-400">
+                          {u.last_ip ? 'Monitored / Logged' : 'N/A'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-right">
                         {u.role !== 'superadmin' && u.id !== user.id ? (
                           <button 
@@ -211,7 +223,7 @@ export default function Credentials() {
                   ))}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan="4" className="px-4 py-8 text-center text-slate-500 text-sm">
+                      <td colSpan="6" className="px-4 py-8 text-center text-slate-500 text-sm">
                         No credentials found in database.
                       </td>
                     </tr>
