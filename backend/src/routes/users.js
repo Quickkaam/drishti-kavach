@@ -91,13 +91,15 @@ router.post('/', validate(createUserSchema), async (req, res) => {
     }
 
     // Audit log
-    await supabase.from('audit_logs').insert({
-      admin_user: req.user.username,
-      action: 'user_create',
-      target: username,
-      details: { role: finalRole, created_by: req.user.id },
-      ip_address: req.ip,
-    }).catch(() => {});
+    try {
+      await supabase.from('audit_logs').insert({
+        admin_user: req.user.username,
+        action: 'user_create',
+        target: username,
+        details: { role: finalRole, created_by: req.user.id },
+        ip_address: req.ip,
+      });
+    } catch (err) {}
 
     res.status(201).json({ user: { ...data, email } });
   } catch (err) {
@@ -138,13 +140,15 @@ router.patch('/:id', async (req, res) => {
     if (error) throw error;
 
     // Audit log
-    await supabase.from('audit_logs').insert({
-      admin_user: req.user.username,
-      action: 'user_update',
-      target: data.username,
-      details: { updates: Object.keys(updates) },
-      ip_address: req.ip,
-    }).catch(() => {});
+    try {
+      await supabase.from('audit_logs').insert({
+        admin_user: req.user.username,
+        action: 'user_update',
+        target: data.username,
+        details: { updates: Object.keys(updates) },
+        ip_address: req.ip,
+      });
+    } catch (err) {}
 
     res.json({ user: data });
   } catch (err) {
@@ -173,12 +177,14 @@ router.delete('/:id', async (req, res) => {
     await supabase.from('users').update({ is_active: false }).eq('id', req.params.id);
 
     // Audit log
-    await supabase.from('audit_logs').insert({
-      admin_user: req.user.username,
-      action: 'user_delete',
-      target: target?.username || req.params.id,
-      ip_address: req.ip,
-    }).catch(() => {});
+    try {
+      await supabase.from('audit_logs').insert({
+        admin_user: req.user.username,
+        action: 'user_delete',
+        target: target?.username || req.params.id,
+        ip_address: req.ip,
+      });
+    } catch (err) {}
 
     res.json({ ok: true, message: 'User deactivated' });
   } catch (err) {
@@ -207,12 +213,14 @@ router.delete('/:id/permanent', requireRole('superadmin'), async (req, res) => {
     if (error) throw error;
 
     // Audit log
-    await supabase.from('audit_logs').insert({
-      admin_user: req.user.username,
-      action: 'user_permanent_delete',
-      target: target?.username || req.params.id,
-      ip_address: req.ip,
-    }).catch(() => {});
+    try {
+      await supabase.from('audit_logs').insert({
+        admin_user: req.user.username,
+        action: 'user_permanent_delete',
+        target: target?.username || req.params.id,
+        ip_address: req.ip,
+      });
+    } catch (err) {}
 
     res.json({ ok: true, message: 'User permanently deleted' });
   } catch (err) {
