@@ -17,12 +17,12 @@ const PROVIDER_CONFIG = {
   groq: {
     url: 'https://api.groq.com/openai/v1',
     model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-    apiKey: process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY_1,
+    apiKey: process.env.GROQ_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY_1,
   },
   openrouter: {
     url: 'https://openrouter.ai/api',
     model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
-    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY_2,
+    apiKey: process.env.OPENROUTER_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY_2,
   },
 };
 
