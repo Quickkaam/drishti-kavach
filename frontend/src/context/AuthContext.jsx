@@ -14,12 +14,6 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const savedToken = localStorage.getItem('dk_token');
-    if (savedToken === 'demo_token') {
-      setUser({ id: 1, username: 'admin_demo', email: 'demo@drishti.com', role: 'admin' });
-      setToken('demo_token');
-      setLoading(false);
-      return;
-    }
     if (savedToken) {
       api.get('/auth/me')
         .then(res => {
@@ -39,16 +33,6 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password, turnstileToken) => {
-    // Demo mode — bypass auth for preview
-    if (email === 'demo@drishti.com' && password === 'demo1234') {
-      const demoUser = { id: 1, username: 'admin_demo', email, role: 'admin' };
-      localStorage.setItem('dk_token', 'demo_token');
-      localStorage.setItem('dk_refresh', 'demo_refresh');
-      setToken('demo_token');
-      setUser(demoUser);
-      return demoUser;
-    }
-
     const loginData = { email, password };
     if (turnstileToken) loginData.turnstile_token = turnstileToken;
 
