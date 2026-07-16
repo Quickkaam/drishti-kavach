@@ -19,21 +19,10 @@ router.get('/', async (req, res) => {
   try {
     const { data } = await supabase
       .from('users')
-      .select('id, username, email, email_encrypted, role, created_at, last_login, is_active, last_ip')
+      .select('id, username, role, created_at, last_login, is_active, last_ip')
       .order('created_at', { ascending: false });
 
-    // Decrypt emails where needed
-    const users = await Promise.all(
-      (data || []).map(async (u) => {
-        if (u.email_encrypted && !u.email) {
-          try {
-            u.email = await encryption.decryptData(u.email_encrypted);
-          } catch { /* ignore */ }
-        }
-        delete u.email_encrypted;
-        return u;
-      })
-    );
+    const users = data || [];
 
     res.json({ users });
   } catch (err) {
@@ -71,8 +60,6 @@ router.post('/', validate(createUserSchema), async (req, res) => {
       .from('users')
       .insert({
         username,
-        email: emailEncrypted ? null : email,
-        email_encrypted: emailEncrypted,
         email_hash: emailHash,
         password_hash: passwordHash,
         password_salt: salt,
