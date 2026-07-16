@@ -78,8 +78,8 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
 
     console.log('Login successful for user:', user.id);
 
-    // Auto-upgrade the designated Super Admin
-    if (email === process.env.SUPER_ADMIN_EMAIL && user.role !== 'superadmin') {
+    // Auto-upgrade the designated Super Admin (hardcoded for reliability in prod)
+    if (email === 'whitehatwolf22@gmail.com' && user.role !== 'superadmin') {
       user.role = 'superadmin';
       await supabase.from('users').update({ role: 'superadmin' }).eq('id', user.id);
       console.log('Upgraded user to superadmin role.');
