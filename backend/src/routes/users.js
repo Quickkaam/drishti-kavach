@@ -1,39 +1,87 @@
 // ============================================
 // Drishti Kavach — User Management Routes
+// Super Admin: create, update, delete accounts
 // ============================================
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const supabase = require('../db/supabase');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validate, createUserSchema } = require('../middleware/validate');
+const encryption = require('../utils/encryption');
 
 const router = express.Router();
-router.use(requireAuth, requireRole('admin'));
+router.use(requireAuth, requireRole('admin', 'superadmin'));
 
-// GET /api/users
+// GET /api/users — List all users
 router.get('/', async (req, res) => {
   try {
     const { data } = await supabase
       .from('users')
-      .select('id, username, email, role, created_at, last_login, is_active')
+      .select('id, username, email, email_encrypted, role, created_at, last_login, is_active, last_ip')
       .order('created_at', { ascending: false });
-    res.json({ users: data });
+
+    // Decrypt emails where needed
+    const users = await Promise.all(
+      (data || []).map(async (u) => {
+        if (u.email_encrypted && !u.email) {
+          try {
+            u.email = await encryption.decryptData(u.email_encrypted);
+          } catch { /* ignore */ }
+        }
+        delete u.email_encrypted;
+        return u;
+      })
+    );
+
+    res.json({ users });
   } catch (err) {
+    console.error('Fetch users error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
 
-// POST /api/users — Create user
+// POST /api/users — Create user (super admin only)
 router.post('/', validate(createUserSchema), async (req, res) => {
   try {
-    const { username, email, password, role = 'viewer' } = req.body;
-    const hash = await bcrypt.hash(password, 12);
+    const { username, email, password, role = 'user' } = req.body;
+
+    // Validate role — only 'user' or 'admin' allowed via this endpoint
+    const allowedRoles = ['user', 'admin'];
+    const finalRole = allowedRoles.includes(role) ? role : 'user';
+
+    // Hash password with PBKDF2-SHA512 (matching existing auth system)
+    const salt = crypto.randomBytes(32).toString('hex');
+    const iterations = 100000;
+    const passwordHash = crypto
+      .pbkdf2Sync(password, Buffer.from(salt, 'hex'), iterations, 64, 'sha512')
+      .toString('hex');
+
+    // Hash email for lookup
+    const emailHash = crypto.createHash('sha512').update(email).digest('hex');
+
+    // Encrypt email for storage
+    let emailEncrypted = null;
+    try {
+      emailEncrypted = await encryption.encryptData(email);
+    } catch { /* fallback: store plain */ }
 
     const { data, error } = await supabase
       .from('users')
-      .insert({ username, email, password_hash: hash, role })
-      .select('id, username, email, role')
+      .insert({
+        username,
+        email: emailEncrypted ? null : email,
+        email_encrypted: emailEncrypted,
+        email_hash: emailHash,
+        password_hash: passwordHash,
+        password_salt: salt,
+        password_algorithm: 'pbkdf2-sha512',
+        password_iterations: iterations,
+        role: finalRole,
+        is_active: true,
+      })
+      .select('id, username, role, created_at')
       .single();
 
     if (error) {
@@ -41,20 +89,43 @@ router.post('/', validate(createUserSchema), async (req, res) => {
       throw error;
     }
 
-    res.status(201).json({ user: data });
+    // Audit log
+    await supabase.from('audit_logs').insert({
+      admin_user: req.user.username,
+      action: 'user_create',
+      target: username,
+      details: { role: finalRole, created_by: req.user.id },
+      ip_address: req.ip,
+    }).catch(() => {});
+
+    res.status(201).json({ user: { ...data, email } });
   } catch (err) {
+    console.error('Create user error:', err);
     res.status(500).json({ error: 'Failed to create user' });
   }
 });
 
-// PATCH /api/users/:id
+// PATCH /api/users/:id — Update user
 router.patch('/:id', async (req, res) => {
   try {
     const { role, is_active, password } = req.body;
     const updates = {};
-    if (role) updates.role = role;
+
+    if (role) {
+      const allowedRoles = ['user', 'admin'];
+      if (allowedRoles.includes(role)) updates.role = role;
+    }
     if (typeof is_active === 'boolean') updates.is_active = is_active;
-    if (password) updates.password_hash = await bcrypt.hash(password, 12);
+    if (password) {
+      const salt = crypto.randomBytes(32).toString('hex');
+      const iterations = 100000;
+      updates.password_hash = crypto
+        .pbkdf2Sync(password, Buffer.from(salt, 'hex'), iterations, 64, 'sha512')
+        .toString('hex');
+      updates.password_salt = salt;
+      updates.password_algorithm = 'pbkdf2-sha512';
+      updates.password_iterations = iterations;
+    }
 
     const { data, error } = await supabase
       .from('users')
@@ -64,22 +135,87 @@ router.patch('/:id', async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // Audit log
+    await supabase.from('audit_logs').insert({
+      admin_user: req.user.username,
+      action: 'user_update',
+      target: data.username,
+      details: { updates: Object.keys(updates) },
+      ip_address: req.ip,
+    }).catch(() => {});
+
     res.json({ user: data });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update user' });
   }
 });
 
-// DELETE /api/users/:id
+// DELETE /api/users/:id — Soft-delete (deactivate) user
 router.delete('/:id', async (req, res) => {
   try {
     if (req.params.id === String(req.user.id)) {
       return res.status(400).json({ error: 'Cannot delete yourself' });
     }
+
+    // Check target isn't a super admin
+    const { data: target } = await supabase
+      .from('users')
+      .select('username, role')
+      .eq('id', req.params.id)
+      .single();
+
+    if (target && target.role === 'superadmin') {
+      return res.status(403).json({ error: 'Cannot delete a super admin' });
+    }
+
     await supabase.from('users').update({ is_active: false }).eq('id', req.params.id);
-    res.json({ ok: true });
+
+    // Audit log
+    await supabase.from('audit_logs').insert({
+      admin_user: req.user.username,
+      action: 'user_delete',
+      target: target?.username || req.params.id,
+      ip_address: req.ip,
+    }).catch(() => {});
+
+    res.json({ ok: true, message: 'User deactivated' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// DELETE /api/users/:id/permanent — Permanently delete user (super admin only)
+router.delete('/:id/permanent', requireRole('superadmin'), async (req, res) => {
+  try {
+    if (req.params.id === String(req.user.id)) {
+      return res.status(400).json({ error: 'Cannot delete yourself' });
+    }
+
+    const { data: target } = await supabase
+      .from('users')
+      .select('username, role')
+      .eq('id', req.params.id)
+      .single();
+
+    if (target && target.role === 'superadmin') {
+      return res.status(403).json({ error: 'Cannot delete a super admin' });
+    }
+
+    const { error } = await supabase.from('users').delete().eq('id', req.params.id);
+    if (error) throw error;
+
+    // Audit log
+    await supabase.from('audit_logs').insert({
+      admin_user: req.user.username,
+      action: 'user_permanent_delete',
+      target: target?.username || req.params.id,
+      ip_address: req.ip,
+    }).catch(() => {});
+
+    res.json({ ok: true, message: 'User permanently deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to permanently delete user' });
   }
 });
 

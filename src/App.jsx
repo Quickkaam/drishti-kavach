@@ -23,6 +23,7 @@ import DrishtiAI from './pages/DrishtiAI';
 import Websites from './pages/Websites';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
+import Credentials from './pages/Credentials';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -75,8 +76,9 @@ export default function App() {
                 <Route path="ai" element={lazyLoad(DrishtiAI)} />
                 <Route path="websites" element={lazyLoad(Websites)} />
                 <Route path="reports" element={lazyLoad(Reports)} />
-                <Route path="users" element={<ProtectedRoute roles={['admin']}><Users /></ProtectedRoute>} />
-                <Route path="audit" element={<ProtectedRoute roles={['admin']}><AuditLog /></ProtectedRoute>} />
+                <Route path="users" element={<ProtectedRoute roles={['admin', 'superadmin']}><Users /></ProtectedRoute>} />
+                <Route path="credentials" element={<ProtectedRoute roles={['superadmin']}><Credentials /></ProtectedRoute>} />
+                <Route path="audit" element={<ProtectedRoute roles={['admin', 'superadmin']}><AuditLog /></ProtectedRoute>} />
                 <Route path="settings" element={lazyLoad(Settings)} />
               </Route>
               

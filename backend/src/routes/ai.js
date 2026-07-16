@@ -7,14 +7,23 @@ const { v4: uuidv4 } = require('uuid');
 const supabase = require('../db/supabase');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const aiService = require('../services/ai');
+const rateLimit = require('express-rate-limit');
+const { validate, aiChatSchema } = require('../middleware/validate');
 
 const router = express.Router();
 router.use(requireAuth);
 
 // POST /api/ai/chat
-router.post('/chat', async (req, res) => {
+// Rate limiter for AI chat (30 requests per minute per IP)
+const aiChatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'AI request limit exceeded' },
+});
+
+router.post('/chat', aiChatLimiter, validate(aiChatSchema), async (req, res) => {
   try {
-    const { question, website_id, session_id } = req.body;
+    const { question, website_id, session_id, provider } = req.body;
     if (!question) return res.status(400).json({ error: 'Question required' });
 
     console.log('[AI Chat] User ID:', req.user?.id);
@@ -31,7 +40,8 @@ router.post('/chat', async (req, res) => {
       req.user.id,
       website_id,
       question,
-      session_id || uuidv4()
+      session_id || uuidv4(),
+      provider
     );
 
     console.log('[AI Chat] Response:', result?.response?.substring(0, 50) + '...');

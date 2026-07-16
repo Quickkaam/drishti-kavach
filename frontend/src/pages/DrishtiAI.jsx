@@ -162,6 +162,7 @@ export default function DrishtiAI() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [sessionId] = useState(uuidv4());
+  const [selectedProvider, setSelectedProvider] = useState('groq');
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -180,7 +181,8 @@ export default function DrishtiAI() {
       const { data } = await api.post('/ai/chat', { 
         question, 
         website_id: 1,
-        session_id: sessionId 
+        session_id: sessionId,
+        provider: selectedProvider,
       });
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -210,19 +212,27 @@ export default function DrishtiAI() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-white">Drishti AI</h1>
-          <p className="text-slate-500 text-xs">Autonomous Security Intelligence • Powered by Groq</p>
+          <p className="text-slate-500 text-xs">{selectedProvider === 'groq' ? 'Drishti AI Mark 1 (Groq)' : 'Drishti AI Mark 2 (OpenRouter)'}</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5 text-xs text-green-400 bg-green-900/20 border border-green-800/30 px-3 py-1 rounded-full">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
           Guardian Mode Active
         </div>
+        <div className="ml-4 flex items-center gap-2 text-sm">
+          <label htmlFor="provider-select" className="text-slate-400">Provider:</label>
+          <select id="provider-select" value={selectedProvider} onChange={e => setSelectedProvider(e.target.value)} className="bg-navy-800 text-white border border-royal-600 rounded px-2 py-1">
+            <option value="groq">Groq (default)</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+        </div>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+          Guardian Mode Active
       </div>
 
       {/* Quick Prompts */}
       <div className="flex flex-wrap gap-2 mb-4 flex-shrink-0">
         {QUICK_PROMPTS.map(p => (
-          <button key={p} onClick={() => sendMessage(p)}
-                  className="text-xs px-3 py-1.5 rounded-full border border-royal-700/50 text-slate-400 hover:text-gold-400 hover:border-gold-400/40 transition-colors bg-navy-800/50">
+          <button key={p} onClick={() => sendMessage(p)} className="text-xs px-3 py-1.5 rounded-full border border-royal-700/50 text-slate-400 hover:text-gold-400 hover:border-gold-400/40 transition-colors bg-navy-800/50">
             {p}
           </button>
         ))}

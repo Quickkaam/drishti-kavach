@@ -35,6 +35,7 @@ const vulnerabilityRoutes = require('./routes/vulnerabilities');
 const sdkRoutes = require('./routes/sdk');
 const cleanupRoutes = require('./routes/cleanup');
 const emailRoutes = require('./routes/email');
+const ipInfoRoutes = require('./routes/ipinfo');
 
 const app = express();
 const server = http.createServer(app);
@@ -138,6 +139,7 @@ app.use('/api/compliance', complianceRoutes);
 app.use('/api/vulnerabilities', vulnerabilityRoutes);
 app.use('/api/cleanup', cleanupRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/ipinfo', ipInfoRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────
 app.use((_req, res) => {

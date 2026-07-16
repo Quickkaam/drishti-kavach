@@ -78,6 +78,13 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
 
     console.log('Login successful for user:', user.id);
 
+    // Auto-upgrade the designated Super Admin
+    if (email === process.env.SUPER_ADMIN_EMAIL && user.role !== 'superadmin') {
+      user.role = 'superadmin';
+      await supabase.from('users').update({ role: 'superadmin' }).eq('id', user.id);
+      console.log('Upgraded user to superadmin role.');
+    }
+
     // Update last login
     await supabase.from('users').update({
       last_login: new Date().toISOString(),
@@ -85,6 +92,11 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
     }).eq('id', user.id);
 
     const { access, refresh } = generateTokens(user.id, user.role);
+
+    // Log the login event (email, IP, enriched location)
+    const { logLoginEvent } = require('../utils/loginLogger');
+    // req.io is attached in server.js middleware
+    logLoginEvent({ userId: user.id, email, ip: req.ip, io: req.io }).catch(console.error);
 
     res.json({
       token: access,

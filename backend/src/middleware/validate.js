@@ -72,4 +72,5 @@ module.exports = {
   incidentSchema,
   sdkEventSchema,
   createUserSchema,
+  aiChatSchema,
 };
