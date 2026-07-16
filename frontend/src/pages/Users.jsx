@@ -71,7 +71,7 @@ export default function Users() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-royal-800/30 text-left">
-              {['Username', 'Email', 'Role', 'Last Login', 'Status', 'Actions'].map(h => (
+              {['Username', 'Email', 'Role', 'Last Active', 'Last IP', 'Status', 'Actions'].map(h => (
                 <th key={h} className="px-3 py-2.5 text-xs font-medium text-slate-500 uppercase">{h}</th>
               ))}
             </tr>
@@ -85,7 +85,10 @@ export default function Users() {
                   <span className={`text-xs px-2 py-0.5 rounded border ${roleColors[u.role] || ''}`}>{u.role}</span>
                 </td>
                 <td className="px-3 py-2.5 text-slate-500 text-xs">
-                  {u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}
+                  {u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}
+                </td>
+                <td className="px-3 py-2.5 text-slate-400 font-mono text-xs">
+                  {u.last_ip || 'Unknown'}
                 </td>
                 <td className="px-3 py-2.5">
                   <span className={`text-xs ${u.is_active ? 'text-green-400' : 'text-red-400'}`}>
