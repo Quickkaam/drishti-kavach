@@ -8,6 +8,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { validate, blockIpSchema } = require('../middleware/validate');
 const { getIpIntel } = require('../services/ipIntel');
 const { autoBlockIp } = require('../services/ddos');
+const { blockIpCloudflare, unblockIpCloudflare } = require('../services/cloudflare');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -72,6 +73,9 @@ router.post('/block', requireRole('admin', 'analyst'), validate(blockIpSchema), 
     // Emit real-time
     if (req.io) req.io.to('admin').emit('ip_blocked', { ip, reason, by: req.user.username });
 
+    // Also block at Cloudflare edge (if configured)
+    blockIpCloudflare(ip, `Drishti Kavach: ${reason}`).catch(() => {});
+
     res.json({ ok: true, message: `IP ${ip} blocked` });
   } catch (err) {
     res.status(500).json({ error: 'Failed to block IP' });
@@ -106,6 +110,9 @@ router.post('/unblock', requireRole('admin', 'analyst'), async (req, res) => {
     });
 
     res.json({ ok: true, message: `IP ${ip} unblocked` });
+
+    // Also remove block from Cloudflare edge (if configured)
+    unblockIpCloudflare(ip).catch(() => {});
   } catch (err) {
     res.status(500).json({ error: 'Failed to unblock IP' });
   }

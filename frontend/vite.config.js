@@ -11,5 +11,21 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
-  }
+  },
+  build: {
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Core React
+          'react-core': ['react', 'react-dom', 'react-router-dom'],
+          // Charts (largest dep)
+          'charts': ['recharts'],
+          // UI utils
+          'utils': ['axios', 'date-fns'],
+        },
+      },
+    },
+  },
 })
+

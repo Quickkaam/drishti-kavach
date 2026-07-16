@@ -66,6 +66,36 @@ function startCronJobs() {
     }
   });
 
+  // Monthly on 1st at 3:30 AM: Deep cleanup old events (90d+)
+  cron.schedule('30 3 1 * *', async () => {
+    try {
+      const cutoff90 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      const cutoff180 = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.from('security_events').delete().lt('created_at', cutoff90);
+      await supabase.from('ddos_events').delete().lt('created_at', cutoff90);
+      await supabase.from('audit_logs').delete().lt('created_at', cutoff180);
+      console.log('[CRON] Monthly deep cleanup complete');
+    } catch (err) {
+      console.error('[CRON DEEP CLEANUP]', err.message);
+    }
+  });
+
+  // Every 6 hours: DB health log
+  cron.schedule('0 */6 * * *', async () => {
+    try {
+      const { count: eventsCount } = await supabase
+        .from('security_events')
+        .select('id', { count: 'exact', head: true });
+      const { count: blockedCount } = await supabase
+        .from('ip_block_list')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+      console.log(`[CRON DB HEALTH] Security events: ${eventsCount} | Blocked IPs: ${blockedCount}`);
+    } catch (err) {
+      console.error('[CRON DB HEALTH]', err.message);
+    }
+  });
+
   console.log('[CRON] All jobs scheduled ✓');
 }
 
