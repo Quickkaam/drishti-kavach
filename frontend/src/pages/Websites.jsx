@@ -9,8 +9,15 @@ export default function Websites() {
   const [websites, setWebsites] = useState([]);
   const [creating, setCreating] = useState(false);
   const [snippetFor, setSnippetFor] = useState(null);
+  const [settingsFor, setSettingsFor] = useState(null);
   const [form, setForm] = useState({ name: '', domain: '' });
   const [newKey, setNewKey] = useState(null);
+
+  // Settings form state
+  const [settingsForm, setSettingsForm] = useState({
+    ga_id: '',
+    seo: { title: '', description: '', keywords: '', google_verify: '' }
+  });
 
   useEffect(() => { fetchWebsites(); }, []);
 
@@ -39,6 +46,37 @@ export default function Websites() {
     const { data } = await api.post(`/websites/${id}/regenerate-key`);
     alert(`New API key: ${data.api_key}\n\nSave this — it won't be shown again.`);
     fetchWebsites();
+  };
+
+  const openSettings = (website) => {
+    const s = website.settings || {};
+    setSettingsForm({
+      ga_id: s.ga_id || '',
+      seo: {
+        title: s.seo?.title || '',
+        description: s.seo?.description || '',
+        keywords: s.seo?.keywords || '',
+        google_verify: s.seo?.google_verify || ''
+      }
+    });
+    setSettingsFor(website);
+  };
+
+  const saveSettings = async () => {
+    try {
+      // Merge new settings with existing ones if any
+      const currentSettings = settingsFor.settings || {};
+      const updatedSettings = {
+        ...currentSettings,
+        ga_id: settingsForm.ga_id,
+        seo: settingsForm.seo
+      };
+      await api.patch(`/websites/${settingsFor.id}`, { settings: updatedSettings });
+      setSettingsFor(null);
+      fetchWebsites();
+    } catch (e) {
+      alert('Failed to save settings');
+    }
   };
 
   return (
@@ -102,8 +140,9 @@ export default function Websites() {
             )}
 
             <div className="flex flex-wrap gap-2 pt-1">
-              <button onClick={() => getSnippet(w.id)} className="dk-btn-secondary text-xs py-1">📋 Get Snippet</button>
-              <button onClick={() => regenKey(w.id)} className="dk-btn-secondary text-xs py-1">🔑 Regen Key</button>
+              <button onClick={() => getSnippet(w.id)} className="dk-btn-secondary text-xs py-1">📋 Snippet</button>
+              <button onClick={() => openSettings(w)} className="dk-btn-secondary text-xs py-1">⚙️ Settings</button>
+              <button onClick={() => regenKey(w.id)} className="dk-btn-secondary text-xs py-1 border-red-900/30 text-red-400 hover:bg-red-900/20">🔑 Regen Key</button>
             </div>
           </div>
         ))}
@@ -125,6 +164,89 @@ export default function Websites() {
                     className="dk-btn-primary text-xs py-1.5 mt-3">
               📋 Copy to Clipboard
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Website Settings Modal (SEO / GA4) */}
+      {settingsFor && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-6">
+          <div className="bg-navy-800 border border-royal-800/50 rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-700 pb-3">
+              <h3 className="font-bold text-white text-lg">Website Integrations</h3>
+              <button onClick={() => setSettingsFor(null)} className="text-slate-500 hover:text-white text-xl">✕</button>
+            </div>
+
+            <div className="space-y-5">
+              {/* Google Analytics Section */}
+              <div className="p-4 bg-slate-900/50 border border-slate-700/50 rounded-lg">
+                <h4 className="font-semibold text-royal-400 mb-3 text-sm flex items-center gap-2">
+                  📊 Google Analytics (GA4)
+                </h4>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Measurement ID</label>
+                  <input 
+                    value={settingsForm.ga_id} 
+                    onChange={e => setSettingsForm(p => ({ ...p, ga_id: e.target.value }))}
+                    placeholder="G-XXXXXXXXXX" 
+                    className="dk-input text-sm" 
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">If provided, the SDK snippet will automatically track pageviews via GA4.</p>
+                </div>
+              </div>
+
+              {/* Google SEO Section */}
+              <div className="p-4 bg-slate-900/50 border border-slate-700/50 rounded-lg">
+                <h4 className="font-semibold text-gold-400 mb-3 text-sm flex items-center gap-2">
+                  🔍 SEO Injection
+                </h4>
+                <p className="text-[10px] text-slate-400 mb-3">Drishti Kavach SDK will automatically inject these into the head of your website.</p>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">SEO Title</label>
+                    <input 
+                      value={settingsForm.seo.title} 
+                      onChange={e => setSettingsForm(p => ({ ...p, seo: { ...p.seo, title: e.target.value } }))}
+                      placeholder="My Awesome Website" 
+                      className="dk-input text-sm" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">SEO Description</label>
+                    <textarea 
+                      value={settingsForm.seo.description} 
+                      onChange={e => setSettingsForm(p => ({ ...p, seo: { ...p.seo, description: e.target.value } }))}
+                      placeholder="Brief description of the site for search engines..." 
+                      className="dk-input text-sm h-20 resize-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Keywords</label>
+                    <input 
+                      value={settingsForm.seo.keywords} 
+                      onChange={e => setSettingsForm(p => ({ ...p, seo: { ...p.seo, keywords: e.target.value } }))}
+                      placeholder="security, soc, drishti kavach" 
+                      className="dk-input text-sm" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1">Google Site Verification Code</label>
+                    <input 
+                      value={settingsForm.seo.google_verify} 
+                      onChange={e => setSettingsForm(p => ({ ...p, seo: { ...p.seo, google_verify: e.target.value } }))}
+                      placeholder="xyz123..." 
+                      className="dk-input text-sm font-mono" 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={saveSettings} className="dk-btn-primary flex-1">Save Configurations</button>
+                <button onClick={() => setSettingsFor(null)} className="dk-btn-secondary">Cancel</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

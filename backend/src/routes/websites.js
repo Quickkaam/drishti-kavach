@@ -129,31 +129,70 @@ router.get('/:id/snippet', async (req, res) => {
   try {
     const { data: website } = await supabase
       .from('websites')
-      .select('api_key, domain, name')
+      .select('api_key, domain, name, settings')
       .eq('id', req.params.id)
       .single();
 
     if (!website) return res.status(404).json({ error: 'Website not found' });
 
     const apiUrl = process.env.API_URL || 'https://your-api.onrender.com';
-    const snippet = `<!-- Drishti Kavach SDK — दृष्टि कवच -->
+    const settings = website.settings || {};
+    const hasGA = !!settings.ga_id;
+    const hasSEO = !!settings.seo;
+
+    let snippet = `<!-- Drishti Kavach SDK — दृष्टि कवच -->
 <script>
 (function(){
   const DK = { apiKey: '${website.api_key}', api: '${apiUrl}/api/sdk' };
   function send(type, data) {
+    if(!navigator.sendBeacon) return;
     navigator.sendBeacon(DK.api + '/log',
       JSON.stringify({ event_type: type, page_url: location.href, event_data: data, referrer: document.referrer }));
   }
   // Track page view
   send('page_view', { title: document.title });
-  // Track security events
+  
+  // Expose manual report function
   window.__dk_report = (type, level, payload) => fetch(DK.api + '/security', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-API-Key': DK.apiKey },
     body: JSON.stringify({ type, level, payload, url: location.href })
-  });
-})();
-</script>`;
+  });`;
+
+    if (hasSEO) {
+      const seo = settings.seo;
+      snippet += `\n
+  // SEO Injection
+  function setMeta(name, content, isProp) {
+    if(!content) return;
+    const attr = isProp ? 'property' : 'name';
+    let el = document.querySelector(\`meta[\${attr}="\${name}"]\`);
+    if(!el) { el = document.createElement('meta'); el.setAttribute(attr, name); document.head.appendChild(el); }
+    el.setAttribute('content', content);
+  }
+  if('${seo.title}') document.title = '${seo.title.replace(/'/g, "\\'")}';
+  setMeta('description', '${(seo.description || '').replace(/'/g, "\\'")}', false);
+  setMeta('keywords', '${(seo.keywords || '').replace(/'/g, "\\'")}', false);
+  setMeta('google-site-verification', '${(seo.google_verify || '').replace(/'/g, "\\'")}', false);
+  setMeta('og:title', '${seo.title ? seo.title.replace(/'/g, "\\'") : ''}', true);
+  setMeta('og:description', '${(seo.description || '').replace(/'/g, "\\'")}', true);`;
+    }
+
+    if (hasGA) {
+      snippet += `\n
+  // Google Analytics Integration
+  const gaId = '${settings.ga_id}';
+  const gs = document.createElement('script');
+  gs.async = true;
+  gs.src = 'https://www.googletagmanager.com/gtag/js?id=' + gaId;
+  document.head.appendChild(gs);
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', gaId);`;
+    }
+
+    snippet += `\n})();\n</script>`;
 
     res.json({ snippet });
   } catch (err) {
