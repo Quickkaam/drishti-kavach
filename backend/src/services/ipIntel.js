@@ -5,6 +5,7 @@
 
 const axios = require('axios');
 const supabase = require('../db/supabase');
+const { fetchVirusTotal } = require('./virusTotal');
 
 const CACHE_TTL_HOURS = 24 * 7; // 7 days
 
@@ -26,12 +27,13 @@ async function getIpIntel(ip) {
   }
 
   // Fetch from all sources in parallel
-  const [geo, abuse, greynoise, otx, urlscan] = await Promise.allSettled([
+  const [geo, abuse, greynoise, otx, urlscan, vt] = await Promise.allSettled([
     fetchGeo(ip),
     fetchAbuseIPDB(ip),
     fetchGreyNoise(ip),
     fetchAlienVaultOTX(ip),     // FREE — no key needed
     fetchURLScan(ip),           // FREE — no key needed
+    fetchVirusTotal(ip),
   ]);
 
   const geoData      = geo.status      === 'fulfilled' ? geo.value      : {};
@@ -39,6 +41,7 @@ async function getIpIntel(ip) {
   const greynoiseData = greynoise.status === 'fulfilled' ? greynoise.value : {};
   const otxData      = otx.status      === 'fulfilled' ? otx.value      : {};
   const urlscanData  = urlscan.status  === 'fulfilled' ? urlscan.value  : {};
+  const vtData       = vt.status       === 'fulfilled' ? vt.value       : {};
 
   // Composite threat score (0–100)
   let threatScore = 0;
@@ -48,6 +51,7 @@ async function getIpIntel(ip) {
   if (otxData.pulse_count > 0)                   threatScore += Math.min(20, otxData.pulse_count * 2);
   if (otxData.malicious)                         threatScore += 15;
   if (urlscanData.malicious)                     threatScore += 15;
+  if (vtData.malicious)                          threatScore += 20;
   if (abuseData.totalReports > 10)               threatScore += 10;
   threatScore = Math.min(100, Math.round(threatScore));
 
@@ -74,6 +78,8 @@ async function getIpIntel(ip) {
     otx_malicious:    otxData.malicious      || false,
     // URLScan
     urlscan_malicious: urlscanData.malicious || false,
+    // VirusTotal
+    vt_malicious:     vtData.malicious       || false,
     last_reported_at: abuseData.lastReportedAt || null,
     cached_at:        new Date().toISOString(),
   };

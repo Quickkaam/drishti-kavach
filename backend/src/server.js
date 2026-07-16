@@ -8,7 +8,10 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
+const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const Sentry = require('@sentry/node');
+const { nodeProfilingIntegration } = require('@sentry/profiling-node');
 const { Server } = require('socket.io');
 
 const { initSocketIO } = require('./websocket/socket');
@@ -36,9 +39,31 @@ const sdkRoutes = require('./routes/sdk');
 const cleanupRoutes = require('./routes/cleanup');
 const emailRoutes = require('./routes/email');
 const ipInfoRoutes = require('./routes/ipinfo');
+const integrationsRoutes = require('./routes/integrations');
 
 const app = express();
 const server = http.createServer(app);
+
+// ─── Sentry Initialization ────────────────────────────────────
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    integrations: [
+      new Sentry.Integrations.Http({ tracing: true }),
+      new Sentry.Integrations.Express({ app }),
+      nodeProfilingIntegration(),
+    ],
+    tracesSampleRate: 1.0,
+    profilesSampleRate: 1.0,
+  });
+}
+
+// Sentry Request Handler (must be first middleware)
+if (process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+}
+
 const io = new Server(server, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -140,11 +165,17 @@ app.use('/api/vulnerabilities', vulnerabilityRoutes);
 app.use('/api/cleanup', cleanupRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/ipinfo', ipInfoRoutes);
+app.use('/api/integrations', integrationsRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
+
+// Sentry Error Handler (must be before other error handlers)
+if (process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 // ─── Global Error Handler ─────────────────────────────────────
 app.use((err, _req, res, _next) => {
