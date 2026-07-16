@@ -170,6 +170,7 @@ export default function Credentials() {
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Account</th>
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Last Active</th>
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">IP Address</th>
                     <th className="px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">IP Information</th>
                     <th className="px-4 py-3 text-xs font-medium text-red-500/70 uppercase tracking-wider text-right">Danger Zone</th>
@@ -198,6 +199,14 @@ export default function Credentials() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
+                        <div className="text-xs text-slate-300">
+                          {u.last_login ? new Date(u.last_login).toLocaleString() : new Date(u.created_at).toLocaleString()}
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {u.last_login ? 'Last Login' : 'Account Created'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
                         <span className="text-xs font-mono text-slate-300 bg-slate-800/50 px-2 py-1 rounded">
                           {u.last_ip || 'Unknown'}
                         </span>
@@ -223,7 +232,7 @@ export default function Credentials() {
                   ))}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="px-4 py-8 text-center text-slate-500 text-sm">
+                      <td colSpan="7" className="px-4 py-8 text-center text-slate-500 text-sm">
                         No credentials found in database.
                       </td>
                     </tr>
