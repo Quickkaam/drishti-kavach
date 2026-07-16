@@ -1,15 +1,17 @@
 // ============================================
-// Drishti Kavach — Vulnerability Scanner Routes
+// Drishti Kavach — Vulnerability & CVE Routes
+// NVD API + CIRCL + OSV + GitHub Advisories + HIBP
 // ============================================
 
 const express = require('express');
 const supabase = require('../db/supabase');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { searchCVEs, getCVEDetails, queryOSV, searchGitHubAdvisories, checkBreaches } = require('../services/breach');
 
 const router = express.Router();
 router.use(requireAuth);
 
-// GET /api/vulnerabilities — Recent scan results from security events
+// GET /api/vulnerabilities — Recent high/critical security events
 router.get('/', async (req, res) => {
   try {
     const { website_id } = req.query;
@@ -27,7 +29,70 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/vulnerabilities/scan — Trigger scan summary
+// GET /api/vulnerabilities/cve/search?q=apache&severity=HIGH
+// Search NVD CVE database — FREE, no key needed
+router.get('/cve/search', async (req, res) => {
+  try {
+    const { q, severity, limit = 10 } = req.query;
+    if (!q) return res.status(400).json({ error: 'Query parameter "q" is required' });
+    const result = await searchCVEs(q, { limit: Number(limit), severity });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'CVE search failed' });
+  }
+});
+
+// GET /api/vulnerabilities/cve/:id — CVE details via CIRCL
+router.get('/cve/:id', async (req, res) => {
+  try {
+    const cve = await getCVEDetails(req.params.id);
+    if (!cve) return res.status(404).json({ error: 'CVE not found' });
+    res.json({ cve });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch CVE details' });
+  }
+});
+
+// GET /api/vulnerabilities/osv?package=express&ecosystem=npm
+// Query OSV for package vulnerabilities — FREE, no key needed
+router.get('/osv', async (req, res) => {
+  try {
+    const { package: pkg, ecosystem = 'npm' } = req.query;
+    if (!pkg) return res.status(400).json({ error: 'Parameter "package" is required' });
+    const vulns = await queryOSV(pkg, ecosystem);
+    res.json({ package: pkg, ecosystem, vulnerabilities: vulns });
+  } catch (err) {
+    res.status(500).json({ error: 'OSV query failed' });
+  }
+});
+
+// GET /api/vulnerabilities/advisories?q=sql+injection
+// GitHub Security Advisories — FREE, no key needed
+router.get('/advisories', async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) return res.status(400).json({ error: 'Query parameter "q" is required' });
+    const advisories = await searchGitHubAdvisories(q);
+    res.json({ advisories });
+  } catch (err) {
+    res.status(500).json({ error: 'Advisory search failed' });
+  }
+});
+
+// GET /api/vulnerabilities/breach?domain=example.com
+// HaveIBeenPwned domain breach check
+router.get('/breach', requireRole('admin', 'superadmin'), async (req, res) => {
+  try {
+    const { domain } = req.query;
+    if (!domain) return res.status(400).json({ error: 'Parameter "domain" is required' });
+    const result = await checkBreaches(domain);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Breach check failed' });
+  }
+});
+
+// POST /api/vulnerabilities/scan — Scan summary from DB events
 router.post('/scan', requireRole('admin', 'analyst'), async (req, res) => {
   try {
     const { website_id } = req.body;
@@ -57,3 +122,4 @@ router.post('/scan', requireRole('admin', 'analyst'), async (req, res) => {
 });
 
 module.exports = router;
+
