@@ -61,7 +61,7 @@ const createUserSchema = z.object({
   username: z.string().min(3).max(50),
   email: z.string().email(),
   password: z.string().min(8),
-  role: z.enum(['admin', 'analyst', 'viewer', 'client']).optional(),
+  role: z.enum(['user', 'admin', 'superadmin', 'analyst', 'viewer', 'client']).optional(),
 });
 
 const aiChatSchema = z.object({
