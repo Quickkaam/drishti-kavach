@@ -222,4 +222,74 @@ router.get('/:id/stats', async (req, res) => {
   }
 });
 
+// ─── POST /api/websites/:id/upload ────────────────────────────
+// AI-powered ZIP upload: inject tracking code → return modified ZIP
+router.post('/:id/upload', requireRole('admin'), async (req, res) => {
+  try {
+    const websiteId = req.params.id;
+
+    // Fetch website and its API key
+    const { data: website, error } = await supabase
+      .from('websites')
+      .select('id, name, api_key, domain')
+      .eq('id', websiteId)
+      .single();
+
+    if (error || !website) return res.status(404).json({ error: 'Website not found' });
+    if (!website.api_key) return res.status(400).json({ error: 'Website has no API key. Regenerate key first.' });
+
+    // Expect base64-encoded ZIP in body
+    const { zipBase64 } = req.body;
+    if (!zipBase64) return res.status(400).json({ error: 'Missing zipBase64 in request body' });
+
+    const zipBuffer = Buffer.from(zipBase64, 'base64');
+    if (zipBuffer.length === 0) return res.status(400).json({ error: 'Empty ZIP file' });
+    if (zipBuffer.length > 52428800) return res.status(413).json({ error: 'ZIP file too large (max 50MB)' });
+
+    // Process ZIP
+    const ZipProcessor = require('../services/zipProcessor');
+    const processor = new ZipProcessor(website.api_key, websiteId);
+    const result = await processor.process(zipBuffer);
+
+    // Log integration
+    await supabase.from('integration_logs').insert({
+      website_id:        websiteId,
+      method:            'zip_upload',
+      files_processed:   result.filesProcessed,
+      tracking_injected: result.filesInjected > 0,
+      status:            'success',
+      details:           { filesProcessed: result.filesProcessed, filesInjected: result.filesInjected },
+    });
+
+    // Audit log
+    await supabase.from('audit_logs').insert({
+      website_id:  websiteId,
+      admin_user:  req.user.username,
+      action:      'zip_upload',
+      target:      website.domain,
+      details:     { filesProcessed: result.filesProcessed, filesInjected: result.filesInjected },
+      ip_address:  req.ip,
+    });
+
+    res.json({
+      success:        true,
+      filesProcessed: result.filesProcessed,
+      filesInjected:  result.filesInjected,
+      zipBase64:      result.zipBuffer.toString('base64'),
+    });
+  } catch (err) {
+    console.error('[ZIP UPLOAD]', err.message);
+
+    await supabase.from('integration_logs').insert({
+      website_id:    parseInt(req.params.id),
+      method:        'zip_upload',
+      status:        'error',
+      error_message: err.message,
+    }).catch(() => {});
+
+    res.status(500).json({ error: 'ZIP processing failed: ' + err.message });
+  }
+});
+
 module.exports = router;
+

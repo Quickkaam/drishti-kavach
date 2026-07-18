@@ -156,7 +156,34 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id — Soft-delete (deactivate) user
+// POST /api/users/me/delete-request
+router.post('/me/delete-request', async (req, res) => {
+  try {
+    const user_id = req.user.id;
+    
+    // Deactivate user and mark for deletion
+    await supabase.from('users').update({ 
+      is_active: false, 
+      deletion_requested_at: new Date().toISOString() 
+    }).eq('id', user_id);
+
+    // Audit the action
+    try {
+      await supabase.from('compliance_logs').insert({
+        user_id,
+        action: 'account_deletion_requested',
+        ip_address: req.ip
+      });
+    } catch(e) {}
+
+    res.json({ ok: true, message: 'Account deletion requested' });
+  } catch (err) {
+    console.error('Delete request error:', err);
+    res.status(500).json({ error: 'Failed to process deletion request' });
+  }
+});
+
+// GET /api/users/:id — Soft-delete (deactivate) user
 router.delete('/:id', async (req, res) => {
   try {
     if (req.params.id === String(req.user.id)) {
@@ -225,6 +252,53 @@ router.delete('/:id/permanent', requireRole('superadmin'), async (req, res) => {
     res.json({ ok: true, message: 'User permanently deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to permanently delete user' });
+  }
+});
+
+// PATCH /api/users/:id/reset-password — Reset password (super admin only)
+router.patch('/:id/reset-password', requireRole('superadmin'), async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
+
+    const salt = crypto.randomBytes(32).toString('hex');
+    const iterations = 100000;
+    const passwordHash = crypto
+      .pbkdf2Sync(password, Buffer.from(salt, 'hex'), iterations, 64, 'sha512')
+      .toString('hex');
+
+    const updates = {
+      password_hash: passwordHash,
+      password_salt: salt,
+      password_algorithm: 'pbkdf2-sha512',
+      password_iterations: iterations,
+    };
+
+    const { data: target, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select('username')
+      .single();
+
+    if (error) throw error;
+
+    // Audit log
+    try {
+      await supabase.from('audit_logs').insert({
+        admin_user: req.user.username,
+        action: 'user_password_reset',
+        target: target.username,
+        ip_address: req.ip,
+      });
+    } catch (err) {}
+
+    res.json({ ok: true, message: 'Password reset successfully' });
+  } catch (err) {
+    console.error('Password reset error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

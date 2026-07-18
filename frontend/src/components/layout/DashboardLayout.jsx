@@ -13,9 +13,11 @@ import { useSocket } from '../../context/SocketContext';
 
 const NAV = [
   { path: '/',            icon: '◈', label: 'OVERVIEW',        end: true },
+  { path: '/analytics',  icon: '◉', label: 'ANALYTICS',        badge: 'NEW' },
   { path: '/security',   icon: '⬡', label: 'SECURITY EVENTS' },
   { path: '/ddos',       icon: '◉', label: 'DDOS MONITOR' },
   { path: '/ip',         icon: '⬢', label: 'IP MANAGEMENT' },
+  { path: '/mitre',      icon: '🎯', label: 'MITRE ATT&CK',    badge: 'NEW' },
   { path: '/incidents',  icon: '⚠', label: 'INCIDENTS' },
   { path: '/forms',      icon: '◆', label: 'FORM INTEL' },
   { path: '/ai',         icon: <img src="/drishti-ai-logo.png" alt="AI" style={{width: '16px', height: '16px', filter: 'drop-shadow(0 0 4px rgba(0,212,255,0.8))'}} />, label: 'DRISHTI AI', isLogo: true },
@@ -311,6 +313,22 @@ export default function DashboardLayout() {
                     flex: 1,
                   }}>
                     {item.label}
+                  </span>
+                )}
+                {/* NEW badge */}
+                {!collapsed && item.badge && !isActive && (
+                  <span style={{
+                    fontSize: '0.5rem',
+                    padding: '0.1rem 0.35rem',
+                    borderRadius: '0.75rem',
+                    background: 'rgba(0,255,136,0.15)',
+                    color: '#00ff88',
+                    border: '1px solid rgba(0,255,136,0.3)',
+                    fontFamily: "'Orbitron', monospace",
+                    letterSpacing: '0.05em',
+                    fontWeight: 700,
+                  }}>
+                    {item.badge}
                   </span>
                 )}
                 {isActive && !collapsed && (

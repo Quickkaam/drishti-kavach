@@ -85,6 +85,28 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
       console.log('Upgraded user to superadmin role.');
     }
 
+    // Check for location change (async)
+    if (user.last_ip && user.last_ip !== req.ip && (user.role === 'admin' || user.role === 'superadmin')) {
+      const { fetchIpInfo } = require('../utils/loginLogger');
+      const alertService = require('../services/alerts');
+      Promise.all([fetchIpInfo(user.last_ip), fetchIpInfo(req.ip)])
+        .then(([oldLoc, newLoc]) => {
+          const oldCity = oldLoc.city || 'Unknown';
+          const newCity = newLoc.city || 'Unknown';
+          const oldCountry = oldLoc.country || 'Unknown';
+          const newCountry = newLoc.country || 'Unknown';
+          
+          if (oldCity !== newCity || oldCountry !== newCountry) {
+            alertService.sendAlert({
+              title: '🚨 Unusual Login Location Detected',
+              message: `Admin ${user.username} (${email}) logged in from **${newCity}, ${newCountry}** (IP: ${req.ip}).\nPreviously logged in from **${oldCity}, ${oldCountry}** (IP: ${user.last_ip}).\nIf this was not you, please reset your password immediately.`,
+              severity: 'critical'
+            });
+          }
+        })
+        .catch(err => console.error('Geoloc check failed:', err));
+    }
+
     // Update last login
     await supabase.from('users').update({
       last_login: new Date().toISOString(),

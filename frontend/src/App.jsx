@@ -28,6 +28,8 @@ import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
+import Analytics from './pages/Analytics';
+import MitreMatrix from './pages/MitreMatrix';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -80,6 +82,8 @@ export default function App() {
                 <Route path="credentials" element={<ProtectedRoute roles={['superadmin']}><Credentials /></ProtectedRoute>} />
                 <Route path="audit" element={<ProtectedRoute roles={['admin', 'superadmin']}><AuditLog /></ProtectedRoute>} />
                 <Route path="settings" element={lazyLoad(Settings)} />
+                <Route path="analytics" element={lazyLoad(Analytics)} />
+                <Route path="mitre" element={lazyLoad(MitreMatrix)} />
               </Route>
               
               {/* Catch-all route for 404 */}

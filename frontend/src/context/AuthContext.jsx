@@ -2,8 +2,9 @@
 // Drishti Kavach — Auth Context
 // ============================================
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../api/client';
+import SessionTimeoutModal from '../components/ui/SessionTimeoutModal';
 
 const AuthContext = createContext(null);
 
@@ -11,6 +12,15 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('dk_token'));
   const [loading, setLoading] = useState(true);
+
+  // Session timeout state
+  const [lastActivity, setLastActivity] = useState(Date.now());
+  const [showTimeout, setShowTimeout] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // 30 minutes total, show warning at 25 minutes
+  const TIMEOUT_MS = 30 * 60 * 1000;
+  const WARNING_MS = 25 * 60 * 1000;
 
   useEffect(() => {
     const savedToken = localStorage.getItem('dk_token');
@@ -31,6 +41,32 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   }, []);
+
+  // Update current time every second to check for timeout
+  useEffect(() => {
+    if (!user) return;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setCurrentTime(now);
+      if (now - lastActivity >= WARNING_MS) {
+        setShowTimeout(true);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [user, lastActivity]);
+
+  // Track user activity
+  const resetActivity = useCallback(() => {
+    setLastActivity(Date.now());
+    setShowTimeout(false);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, resetActivity));
+    return () => events.forEach(e => window.removeEventListener(e, resetActivity));
+  }, [user, resetActivity]);
 
   const login = async (email, password, turnstileToken) => {
     const loginData = { email, password };
@@ -55,6 +91,14 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{ user, token, loading, login, logout }}>
       {children}
+      {user && showTimeout && (
+        <SessionTimeoutModal
+          onStayLoggedIn={resetActivity}
+          onLogout={logout}
+          showAtMs={lastActivity + WARNING_MS}
+          timeoutAtMs={lastActivity + TIMEOUT_MS}
+        />
+      )}
     </AuthContext.Provider>
   );
 }

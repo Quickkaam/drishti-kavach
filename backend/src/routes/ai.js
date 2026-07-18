@@ -11,6 +11,27 @@ const rateLimit = require('express-rate-limit');
 const { validate, aiChatSchema } = require('../middleware/validate');
 
 const router = express.Router();
+
+// GET /api/ai/summary/send — Daily summary dispatched via external cron
+router.get('/summary/send', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const cronSecret = process.env.CRON_SECRET || 'drishti-cron-secret';
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized cron request' });
+    }
+
+    const { data: websites } = await supabase.from('websites').select('id').eq('status', 'active');
+    for (const site of (websites || [])) {
+      await aiService.generateDailySummary(site.id).catch(() => {});
+    }
+
+    res.json({ ok: true, message: 'Daily summaries generated and sent' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to process summaries' });
+  }
+});
+
 router.use(requireAuth);
 
 // POST /api/ai/chat

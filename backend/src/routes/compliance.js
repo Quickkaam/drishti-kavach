@@ -41,4 +41,40 @@ router.get('/logs', async (req, res) => {
   }
 });
 
+// GET /api/compliance/export
+router.get('/export', async (req, res) => {
+  try {
+    const user_id = req.user.id;
+    
+    // Fetch all user related data
+    const [{ data: profile }, { data: audits }] = await Promise.all([
+      supabase.from('users').select('*').eq('id', user_id).single(),
+      supabase.from('audit_logs').select('*').eq('admin_user', req.user.username)
+    ]);
+
+    const exportData = {
+      profile,
+      activity_logs: audits || [],
+      exported_at: new Date().toISOString()
+    };
+
+    // Audit the export action
+    try {
+      await supabase.from('compliance_logs').insert({
+        user_id,
+        action: 'data_export',
+        data_type: 'full_profile_and_activity',
+        ip_address: req.ip
+      });
+    } catch(e) {}
+
+    res.setHeader('Content-Disposition', `attachment; filename="gdpr_export_${req.user.username}.json"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(exportData, null, 2));
+  } catch (err) {
+    console.error('Export error:', err);
+    res.status(500).json({ error: 'Failed to export data' });
+  }
+});
+
 module.exports = router;

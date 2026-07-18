@@ -40,6 +40,8 @@ const cleanupRoutes = require('./routes/cleanup');
 const emailRoutes = require('./routes/email');
 const ipInfoRoutes = require('./routes/ipinfo');
 const integrationsRoutes = require('./routes/integrations');
+const analyticsRoutes = require('./routes/analytics');
+const mitreRoutes = require('./routes/mitre');
 
 const app = express();
 const server = http.createServer(app);
@@ -88,7 +90,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
 }));
 
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '50mb' }));  // Increased for ZIP upload base64 payloads
 app.use(express.urlencoded({ extended: true }));
 
 // Trust proxy for accurate IP detection (render uses proxies)
@@ -166,6 +168,8 @@ app.use('/api/cleanup', cleanupRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/ipinfo', ipInfoRoutes);
 app.use('/api/integrations', integrationsRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/mitre', mitreRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────
 app.use((_req, res) => {

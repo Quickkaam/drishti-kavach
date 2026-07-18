@@ -8,6 +8,8 @@ import api from '../api/client';
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [creating, setCreating] = useState(false);
+  const [resettingUser, setResettingUser] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
   const [form, setForm] = useState({ username: '', email: '', password: '', role: 'viewer' });
 
   useEffect(() => { fetchUsers(); }, []);
@@ -29,6 +31,16 @@ export default function Users() {
   const toggleActive = async (id, current) => {
     await api.patch(`/users/${id}`, { is_active: !current });
     fetchUsers();
+  };
+
+  const resetPassword = async () => {
+    if (!newPassword || newPassword.length < 8) return alert('Password must be at least 8 characters');
+    try {
+      await api.patch(`/users/${resettingUser.id}/reset-password`, { password: newPassword });
+      alert('Password reset successfully');
+      setResettingUser(null);
+      setNewPassword('');
+    } catch (e) { alert(e.response?.data?.error || 'Failed to reset password'); }
   };
 
   const roleColors = { admin: 'text-red-400 border-red-700/30', analyst: 'text-yellow-400 border-yellow-700/30', viewer: 'text-slate-400 border-slate-700/30', client: 'text-blue-400 border-blue-700/30' };
@@ -67,6 +79,22 @@ export default function Users() {
         </div>
       )}
 
+      {resettingUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="dk-card max-w-sm w-full space-y-4">
+            <h3 className="font-semibold text-slate-200">Reset Password for {resettingUser.username}</h3>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1.5">New Password (min 8 chars)</label>
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="dk-input" placeholder="••••••••" />
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button onClick={() => { setResettingUser(null); setNewPassword(''); }} className="text-sm text-slate-400 hover:text-white">Cancel</button>
+              <button onClick={resetPassword} className="dk-btn-primary bg-red-600/80 hover:bg-red-500 border-red-500/50">Reset Password</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="dk-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -95,10 +123,14 @@ export default function Users() {
                     {u.is_active ? '✅ Active' : '🚫 Inactive'}
                   </span>
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 flex space-x-2">
                   <button onClick={() => toggleActive(u.id, u.is_active)}
                           className={`text-xs px-2 py-0.5 rounded border ${u.is_active ? 'text-red-400 border-red-700/30' : 'text-green-400 border-green-700/30'}`}>
                     {u.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button onClick={() => setResettingUser(u)}
+                          className="text-xs px-2 py-0.5 rounded border text-blue-400 border-blue-700/30 hover:bg-blue-900/30">
+                    Reset Password
                   </button>
                 </td>
               </tr>

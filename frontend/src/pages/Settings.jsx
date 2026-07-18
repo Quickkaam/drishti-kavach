@@ -3,7 +3,7 @@
 // ============================================
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Key, Cpu, Zap, Eye, CheckCircle2, XCircle } from 'lucide-react';
+import { Shield, Key, Cpu, Zap, Eye, CheckCircle2, XCircle, Download, Trash2, Lock } from 'lucide-react';
 import api from '../api/client';
 
 export default function Settings() {
@@ -13,6 +13,8 @@ export default function Settings() {
   const [integrations, setIntegrations] = useState(null);
   const [summary, setSummary] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [downloadingData, setDownloadingData] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -57,6 +59,34 @@ export default function Settings() {
     return <XCircle className="w-5 h-5 text-red-400" />;
   };
 
+  const handleDownloadData = async () => {
+    setDownloadingData(true);
+    try {
+      const { data } = await api.get('/compliance/export');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gdpr_export.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) { alert('Failed to download data'); }
+    finally { setDownloadingData(false); }
+  };
+
+  const handleRequestDeletion = async () => {
+    if (!window.confirm("Are you sure you want to request account deletion? Your account will be disabled and permanently deleted after 30 days.")) return;
+    setDeletingAccount(true);
+    try {
+      await api.post('/users/me/delete-request');
+      alert("Account deletion requested. You will be logged out.");
+      window.location.href = '/login';
+    } catch (e) { alert('Failed to request deletion'); }
+    finally { setDeletingAccount(false); }
+  };
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -78,6 +108,14 @@ export default function Settings() {
             }`}
           >
             <div className="flex items-center gap-2"><Zap className="w-4 h-4"/> Integrations</div>
+          </button>
+          <button
+            onClick={() => setActiveTab('privacy')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'privacy' ? 'bg-royal-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+            }`}
+          >
+            <div className="flex items-center gap-2"><Lock className="w-4 h-4"/> Privacy (GDPR)</div>
           </button>
         </div>
       </div>
@@ -200,6 +238,44 @@ export default function Settings() {
               <p className="text-slate-400">Loading integrations...</p>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'privacy' && (
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="dk-card border border-slate-700/50 bg-slate-900/50">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <Download className="w-5 h-5 text-blue-400" /> Export Your Data (GDPR)
+            </h3>
+            <p className="text-sm text-slate-400 mb-6">
+              Download a complete copy of all personal data associated with your account, including your profile information and full activity audit logs. This data will be provided in a machine-readable JSON format.
+            </p>
+            <button 
+              onClick={handleDownloadData} 
+              disabled={downloadingData}
+              className="dk-btn-primary flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" /> 
+              {downloadingData ? 'Preparing Download...' : 'Download My Data'}
+            </button>
+          </div>
+
+          <div className="dk-card border border-red-900/50 bg-red-900/10">
+            <h3 className="text-lg font-bold text-red-400 mb-4 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" /> Request Account Deletion
+            </h3>
+            <p className="text-sm text-slate-400 mb-6">
+              Permanently delete your account and all associated data. Once requested, your account will enter a 30-day grace period where it remains disabled. After 30 days, it will be permanently removed.
+            </p>
+            <button 
+              onClick={handleRequestDeletion}
+              disabled={deletingAccount}
+              className="px-4 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/30 rounded-md font-medium text-sm transition-all flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" /> 
+              {deletingAccount ? 'Processing...' : 'Request Deletion'}
+            </button>
+          </div>
         </div>
       )}
 
