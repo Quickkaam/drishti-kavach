@@ -43,6 +43,7 @@ function formatDuration(seconds) {
 }
 
 export default function Analytics() {
+  const { user } = useAuth();
   // Super admin has no website_id — default to website 1 (Quick Kaam)
   const websiteId = user?.website_id || 1;
 
