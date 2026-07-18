@@ -29,10 +29,12 @@ function detectBrowser(ua) {
 
 // Helper: get website ID based on user role
 function getWebsiteId(req, paramId) {
-  if (req.user.role === 'superadmin' && paramId && paramId !== 'global') {
-    return parseInt(paramId);
+  // Super admin can view any website; default to website 1 (Quick Kaam) if not specified
+  if (req.user.role === 'super_admin' || req.user.role === 'superadmin') {
+    if (paramId && paramId !== 'global') return parseInt(paramId);
+    return req.user.website_id || 1; // default to Quick Kaam
   }
-  return req.user.website_id;
+  return req.user.website_id || 1;
 }
 
 // ─── GET /api/analytics/website/:id/overview ──────────────────
