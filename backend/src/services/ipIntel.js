@@ -6,6 +6,7 @@
 const axios = require('axios');
 const supabase = require('../db/supabase');
 const { fetchVirusTotal } = require('./virusTotal');
+const { logError: logErrorLog } = require('./logging');
 
 const CACHE_TTL_HOURS = 24 * 7; // 7 days
 
@@ -26,87 +27,103 @@ async function getIpIntel(ip) {
     if (age < CACHE_TTL_HOURS) return cached;
   }
 
-  // Fetch from all sources in parallel
-  const [geo, abuse, greynoise, otx, urlscan, vt] = await Promise.allSettled([
-    fetchGeo(ip),
-    fetchAbuseIPDB(ip),
-    fetchGreyNoise(ip),
-    fetchAlienVaultOTX(ip),     // FREE — no key needed
-    fetchURLScan(ip),           // FREE — no key needed
-    fetchVirusTotal(ip),
-  ]);
+  try {
+    // Fetch from all sources in parallel
+    const [geo, abuse, greynoise, otx, urlscan, vt] = await Promise.allSettled([
+      fetchGeo(ip),
+      fetchAbuseIPDB(ip),
+      fetchGreyNoise(ip),
+      fetchAlienVaultOTX(ip),     // FREE — no key needed
+      fetchURLScan(ip),           // FREE — no key needed
+      fetchVirusTotal(ip),
+    ]);
 
-  const geoData      = geo.status      === 'fulfilled' ? geo.value      : {};
-  const abuseData    = abuse.status    === 'fulfilled' ? abuse.value    : {};
-  const greynoiseData = greynoise.status === 'fulfilled' ? greynoise.value : {};
-  const otxData      = otx.status      === 'fulfilled' ? otx.value      : {};
-  const urlscanData  = urlscan.status  === 'fulfilled' ? urlscan.value  : {};
-  const vtData       = vt.status       === 'fulfilled' ? vt.value       : {};
+    const geoData      = geo.status      === 'fulfilled' ? geo.value      : {};
+    const abuseData    = abuse.status    === 'fulfilled' ? abuse.value    : {};
+    const greynoiseData = greynoise.status === 'fulfilled' ? greynoise.value : {};
+    const otxData      = otx.status      === 'fulfilled' ? otx.value      : {};
+    const urlscanData  = urlscan.status  === 'fulfilled' ? urlscan.value  : {};
+    const vtData       = vt.status       === 'fulfilled' ? vt.value       : {};
 
-  // Composite threat score (0–100)
-  let threatScore = 0;
-  if (abuseData.abuseConfidenceScore)            threatScore += abuseData.abuseConfidenceScore * 0.4;
-  if (greynoiseData.classification === 'malicious') threatScore += 25;
-  if (greynoiseData.classification === 'suspicious') threatScore += 12;
-  if (otxData.pulse_count > 0)                   threatScore += Math.min(20, otxData.pulse_count * 2);
-  if (otxData.malicious)                         threatScore += 15;
-  if (urlscanData.malicious)                     threatScore += 15;
-  if (vtData.malicious)                          threatScore += 20;
-  if (abuseData.totalReports > 10)               threatScore += 10;
-  threatScore = Math.min(100, Math.round(threatScore));
+    // Composite threat score (0–100)
+    let threatScore = 0;
+    if (abuseData.abuseConfidenceScore)            threatScore += abuseData.abuseConfidenceScore * 0.4;
+    if (greynoiseData.classification === 'malicious') threatScore += 25;
+    if (greynoiseData.classification === 'suspicious') threatScore += 12;
+    if (otxData.pulse_count > 0)                   threatScore += Math.min(20, otxData.pulse_count * 2);
+    if (otxData.malicious)                         threatScore += 15;
+    if (urlscanData.malicious)                     threatScore += 15;
+    if (vtData.malicious)                          threatScore += 20;
+    if (abuseData.totalReports > 10)               threatScore += 10;
+    threatScore = Math.min(100, Math.round(threatScore));
 
-  const intel = {
-    ip,
-    country:          geoData.country        || null,
-    country_code:     geoData.countryCode    || null,
-    region:           geoData.regionName     || null,
-    city:             geoData.city           || null,
-    latitude:         geoData.lat            || null,
-    longitude:        geoData.lon            || null,
-    isp:              geoData.isp            || null,
-    organization:     geoData.org            || null,
-    as_number:        geoData.as             || null,
-    threat_score:     threatScore,
-    abuse_confidence: abuseData.abuseConfidenceScore || 0,
-    total_reports:    abuseData.totalReports  || 0,
-    is_scanner:       greynoiseData.classification === 'malicious' || false,
-    is_vpn:           geoData.proxy          || false,
-    is_tor:           false,
-    is_bot:           greynoiseData.bot      || false,
-    // OTX
-    otx_pulse_count:  otxData.pulse_count    || 0,
-    otx_malicious:    otxData.malicious      || false,
-    // URLScan
-    urlscan_malicious: urlscanData.malicious || false,
-    // VirusTotal
-    vt_malicious:     vtData.malicious       || false,
-    last_reported_at: abuseData.lastReportedAt || null,
-    cached_at:        new Date().toISOString(),
-  };
+    const intel = {
+      ip,
+      country:          geoData.country        || null,
+      country_code:     geoData.countryCode    || null,
+      region:           geoData.regionName     || null,
+      city:             geoData.city           || null,
+      latitude:         geoData.lat            || null,
+      longitude:        geoData.lon            || null,
+      isp:              geoData.isp            || null,
+      organization:     geoData.org            || null,
+      as_number:        geoData.as             || null,
+      threat_score:     threatScore,
+      abuse_confidence: abuseData.abuseConfidenceScore || 0,
+      total_reports:    abuseData.totalReports  || 0,
+      is_scanner:       greynoiseData.classification === 'malicious' || false,
+      is_vpn:           geoData.proxy          || false,
+      is_tor:           false,
+      is_bot:           greynoiseData.bot      || false,
+      // OTX
+      otx_pulse_count:  otxData.pulse_count    || 0,
+      otx_malicious:    otxData.malicious      || false,
+      // URLScan
+      urlscan_malicious: urlscanData.malicious || false,
+      // VirusTotal
+      vt_malicious:     vtData.malicious       || false,
+      last_reported_at: abuseData.lastReportedAt || null,
+      cached_at:        new Date().toISOString(),
+    };
 
-  // Upsert cache
-  await supabase.from('ip_intel_cache').upsert(intel, { onConflict: 'ip' });
+    // Upsert cache
+    await supabase.from('ip_intel_cache').upsert(intel, { onConflict: 'ip' });
 
-  return intel;
+    return intel;
+  } catch (err) {
+    console.error('[IP INTEL ERROR]', err.message);
+    await logErrorLog({ error: err, message: 'Failed to fetch IP intelligence', context: { ip } });
+    return {};
+  }
 }
 
 async function fetchGeo(ip) {
-  const res = await axios.get(
-    `http://ip-api.com/json/${ip}?fields=status,country,countryCode,regionName,city,lat,lon,isp,org,as,proxy`,
-    { timeout: 4000 }
-  );
-  if (res.data.status === 'success') return res.data;
-  return {};
+  try {
+    const res = await axios.get(
+      `http://ip-api.com/json/${ip}?fields=status,country,countryCode,regionName,city,lat,lon,isp,org,as,proxy`,
+      { timeout: 4000 }
+    );
+    if (res.data.status === 'success') return res.data;
+    return {};
+  } catch (err) {
+    console.error('[GEO FETCH ERROR]', err.message);
+    return {};
+  }
 }
 
 async function fetchAbuseIPDB(ip) {
   if (!process.env.ABUSEIPDB_API_KEY) return {};
-  const res = await axios.get('https://api.abuseipdb.com/api/v2/check', {
-    params: { ipAddress: ip, maxAgeInDays: 90 },
-    headers: { Key: process.env.ABUSEIPDB_API_KEY, Accept: 'application/json' },
-    timeout: 5000,
-  });
-  return res.data.data || {};
+  try {
+    const res = await axios.get('https://api.abuseipdb.com/api/v2/check', {
+      params: { ipAddress: ip, maxAgeInDays: 90 },
+      headers: { Key: process.env.ABUSEIPDB_API_KEY, Accept: 'application/json' },
+      timeout: 5000,
+    });
+    return res.data.data || {};
+  } catch (err) {
+    console.error('[ABUSEIPDB ERROR]', err.message);
+    return {};
+  }
 }
 
 async function fetchGreyNoise(ip) {
@@ -156,4 +173,3 @@ async function fetchURLScan(ip) {
 }
 
 module.exports = { getIpIntel };
-

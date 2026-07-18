@@ -25,6 +25,7 @@ import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Credentials from './pages/Credentials';
 import AuditLog from './pages/AuditLog';
+import Logs from './pages/Logs';
 import Settings from './pages/Settings';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
@@ -81,6 +82,7 @@ export default function App() {
                 <Route path="users" element={<ProtectedRoute roles={['admin', 'superadmin']}><Users /></ProtectedRoute>} />
                 <Route path="credentials" element={<ProtectedRoute roles={['superadmin']}><Credentials /></ProtectedRoute>} />
                 <Route path="audit" element={<ProtectedRoute roles={['admin', 'superadmin']}><AuditLog /></ProtectedRoute>} />
+                <Route path="logs" element={<ProtectedRoute roles={['admin', 'superadmin']}><Logs /></ProtectedRoute>} />
                 <Route path="settings" element={lazyLoad(Settings)} />
                 <Route path="analytics" element={lazyLoad(Analytics)} />
                 <Route path="mitre" element={lazyLoad(MitreMatrix)} />

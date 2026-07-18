@@ -4,6 +4,7 @@
 
 const supabase = require('../db/supabase');
 const axios = require('axios');
+const { logSecurityEvent, logError: logErrorLog } = require('./logging');
 
 // Default thresholds
 const THRESHOLDS = {
@@ -59,6 +60,7 @@ async function checkTrafficSpike(websiteId, io) {
     }
   } catch (err) {
     console.error('[DDoS SPIKE CHECK]', err.message);
+    await logErrorLog({ error: err, message: 'DDoS spike check failed', context: { websiteId } });
   }
 }
 
@@ -88,31 +90,48 @@ async function checkIpFlood(websiteId, io) {
     }
   } catch (err) {
     console.error('[DDoS IP FLOOD]', err.message);
+    await logErrorLog({ error: err, message: 'DDoS IP flood check failed', context: { websiteId } });
   }
 }
 
 async function createDDoSEvent(websiteId, severity, attackType, details, io, affectedIp = null) {
-  const { data } = await supabase.from('ddos_events').insert({
-    website_id: websiteId,
-    severity,
-    attack_type: attackType,
-    details,
-    affected_ip: affectedIp,
-    status: 'active',
-  }).select('id').single();
+  try {
+    const { data } = await supabase.from('ddos_events').insert({
+      website_id: websiteId,
+      severity,
+      attack_type: attackType,
+      details,
+      affected_ip: affectedIp,
+      status: 'active',
+    }).select('id').single();
 
-  // Real-time alert
-  if (io) {
-    io.to(`website:${websiteId}`).emit('ddos_alert', { severity, attackType, details, affectedIp });
-    io.to('admin').emit('ddos_alert', { websiteId, severity, attackType, details });
+    // Log to database
+    await logSecurityEvent({
+      type: 'ddos_attack',
+      severity,
+      description: `${attackType} attack on website ${websiteId}`,
+      websiteId,
+      data: { ...details, ip: affectedIp },
+      ip: affectedIp
+    }).catch(err => console.error('[DDOS LOG ERROR]', err));
+
+    // Real-time alert
+    if (io) {
+      io.to(`website:${websiteId}`).emit('ddos_alert', { severity, attackType, details, affectedIp });
+      io.to('admin').emit('ddos_alert', { websiteId, severity, attackType, details });
+    }
+
+    // Auto-mitigate critical
+    if (severity === 'critical') {
+      await mitigate(websiteId, attackType, data?.id, details, io);
+    }
+
+    return data;
+  } catch (err) {
+    console.error('[DDoS CREATE EVENT]', err.message);
+    await logErrorLog({ error: err, message: 'Failed to create DDoS event', context: { websiteId, attackType } });
+    return null;
   }
-
-  // Auto-mitigate critical
-  if (severity === 'critical') {
-    await mitigate(websiteId, attackType, data?.id, details, io);
-  }
-
-  return data;
 }
 
 async function mitigate(websiteId, attackType, ddosEventId, details, io) {
@@ -149,32 +168,42 @@ async function mitigate(websiteId, attackType, ddosEventId, details, io) {
 
   } catch (err) {
     console.error('[DDoS MITIGATE]', err.message);
+    await logErrorLog({ error: err, message: 'Failed to mitigate DDoS attack', context: { websiteId, attackType } });
   }
 }
 
 async function autoBlockIp(websiteId, ip, reason, io) {
-  await supabase.from('ip_block_list').upsert({
-    website_id: websiteId,
-    ip,
-    reason,
-    blocked_by: 'Drishti AI',
-    severity: 'critical',
-    is_active: true,
-    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h
-  }, { onConflict: 'ip,website_id' });
+  try {
+    await supabase.from('ip_block_list').upsert({
+      website_id: websiteId,
+      ip,
+      reason,
+      blocked_by: 'Drishti AI',
+      severity: 'critical',
+      is_active: true,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h
+    }, { onConflict: 'ip,website_id' });
 
-  if (io) {
-    io.to(`website:${websiteId}`).emit('ip_blocked', { ip, reason });
+    if (io) {
+      io.to(`website:${websiteId}`).emit('ip_blocked', { ip, reason });
+    }
+  } catch (err) {
+    console.error('[AUTO BLOCK]', err.message);
+    await logErrorLog({ error: err, message: 'Failed to auto-block IP', context: { websiteId, ip } });
   }
 }
 
 async function enableCloudflareUnderAttack() {
   if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ZONE_ID) return;
-  await axios.patch(
-    `https://api.cloudflare.com/client/v4/zones/${process.env.CLOUDFLARE_ZONE_ID}/settings/security_level`,
-    { value: 'under_attack' },
-    { headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` } }
-  );
+  try {
+    await axios.patch(
+      `https://api.cloudflare.com/client/v4/zones/${process.env.CLOUDFLARE_ZONE_ID}/settings/security_level`,
+      { value: 'under_attack' },
+      { headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` } }
+    );
+  } catch (err) {
+    console.error('[CLOUDFLARE]', err.message);
+  }
 }
 
 module.exports = { checkTrafficSpike, checkIpFlood, createDDoSEvent, autoBlockIp };

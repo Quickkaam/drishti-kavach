@@ -7,6 +7,7 @@ const supabase = require('../db/supabase');
 const { runCleanup } = require('../routes/cleanup');
 const { generateDailySummary } = require('../services/ai');
 const { checkTrafficSpike, checkIpFlood } = require('../services/ddos');
+const { cleanupOldLogs } = require('../services/logging');
 
 function startCronJobs() {
   console.log('[CRON] Starting scheduled jobs...');
@@ -46,10 +47,13 @@ function startCronJobs() {
     }
   });
 
-  // Daily at 2:00 AM: Data cleanup
+  // Daily at 2:00 AM: Data cleanup (including 30-day log retention)
   cron.schedule('0 2 * * *', async () => {
     try {
       await runCleanup();
+      // Cleanup logs older than 30 days
+      await cleanupOldLogs({ days: 30 });
+      console.log('[CRON] Daily cleanup complete (30-day log retention)');
     } catch (err) {
       console.error('[CRON CLEANUP]', err.message);
     }

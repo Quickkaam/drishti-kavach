@@ -10,6 +10,7 @@ const supabase = require('../db/supabase');
 const { validate, loginSchema } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
 const { verifyTurnstile } = require('../middleware/turnstile');
+const { logAuthEvent, logError: logErrorLog } = require('../services/logging');
 
 const router = express.Router();
 
@@ -73,6 +74,16 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
 
     if (!valid) {
       console.log('Password validation failed:', { providedPassword: password, storedHash: user.password_hash?.substring(0, 50) + '...' });
+      
+      // Log failed login attempt
+      await logAuthEvent({
+        email,
+        ip: req.ip,
+        success: false,
+        failureReason: 'Invalid credentials',
+        userAgent: req.headers['user-agent']
+      }).catch(err => console.error('[LOG FAILED LOGIN]', err));
+      
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -120,6 +131,15 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
     // req.io is attached in server.js middleware
     logLoginEvent({ userId: user.id, email, ip: req.ip, io: req.io }).catch(console.error);
 
+    // Log successful login to database
+    await logAuthEvent({
+      userId: user.id,
+      email,
+      ip: req.ip,
+      success: true,
+      userAgent: req.headers['user-agent']
+    }).catch(err => console.error('[LOG LOGIN EVENT]', err));
+
     res.json({
       token: access,
       refresh_token: refresh,
@@ -132,6 +152,15 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
     });
   } catch (err) {
     console.error('Login error:', err);
+    
+    // Log error to database
+    await logErrorLog({ 
+      error: err, 
+      message: 'Login error', 
+      context: { email, ip: req.ip },
+      level: 'error'
+    }).catch(logErr => console.error('[LOG LOGIN ERROR]', logErr));
+    
     res.status(500).json({ error: 'Login failed' });
   }
 });

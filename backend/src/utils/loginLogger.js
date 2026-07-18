@@ -7,6 +7,8 @@ const path = require('path');
 const zlib = require('zlib');
 // const fetch = require('node-fetch'); // using global fetch
 const supabase = require('../db/supabase');
+const crypto = require('crypto');
+const { logAuthEvent } = require('../services/logging');
 
 // Ensure logs directory exists
 const logsDir = path.resolve(__dirname, '../../logs');
@@ -68,19 +70,24 @@ async function logLoginEvent({ userId, email, ip, io }) {
       location,
       timestamp: new Date().toISOString(),
     };
+    
     // Write compressed line to local file
     const compressed = await compressJsonLine(event);
-    // Append compressed data (binary) to file
     fs.appendFileSync(logFilePath, compressed);
-    // Store in Supabase (optional, assumes table login_logs exists)
+    
+    // Store in Supabase using the new login_logs table
     await supabase.from('login_logs').insert({
       user_id: userId,
       email,
+      email_hash: crypto.createHash('sha512').update(email).digest('hex'),
       ip_address: ip,
       location: JSON.stringify(location),
-      logged_at: event.timestamp,
-      data_compressed: compressed,
+      user_agent: null,
+      success: true,
+      failure_reason: null,
+      created_at: event.timestamp,
     });
+    
     // Emit real‑time admin event if socket provided
     if (io && typeof io.to === 'function') {
       io.to('superadmin').emit('login_event', event);

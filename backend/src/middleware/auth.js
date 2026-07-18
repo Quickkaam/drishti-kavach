@@ -3,6 +3,7 @@
 // ============================================
 
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const supabase = require('../db/supabase');
 const encryption = require('../utils/encryption');
 
@@ -65,10 +66,13 @@ const requireApiKey = async (req, res, next) => {
       return res.status(401).json({ error: 'API key required' });
     }
 
+    // Hash the API key for secure lookup
+    const apiKeyHash = crypto.createHash('sha512').update(apiKey).digest('hex');
+
     const { data: website, error } = await supabase
       .from('websites')
       .select('id, name, domain, status, settings')
-      .eq('api_key', apiKey)
+      .eq('api_key_hash', apiKeyHash)
       .eq('status', 'active')
       .single();
 
