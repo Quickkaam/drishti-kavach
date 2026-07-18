@@ -8,7 +8,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import MobileNavigation from './MobileNavigation';
 import { useTheme, ThemeToggleButton, ThemeStatus } from '../ui/ThemeToggle';
-import { Database, Bot, Cloud, Activity } from 'lucide-react';
+import { Database, Bot, Cloud, Activity, LogOut } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
 
 const NAV = [
@@ -20,6 +20,7 @@ const NAV = [
   { path: '/mitre',      icon: '🎯', label: 'MITRE ATT&CK',    badge: 'NEW' },
   { path: '/incidents',  icon: '⚠', label: 'INCIDENTS' },
   { path: '/forms',      icon: '◆', label: 'FORM INTEL' },
+  { path: '/logs',       icon: <LogOut size={16} />, label: 'SYSTEM LOGS', adminOnly: true, badge: 'NEW' },
   { path: '/ai',         icon: <img src="/drishti-ai-logo.png" alt="AI" style={{width: '16px', height: '16px', filter: 'drop-shadow(0 0 4px rgba(0,212,255,0.8))'}} />, label: 'DRISHTI AI', isLogo: true },
   { path: '/websites',   icon: '⬣', label: 'WEBSITES' },
   { path: '/reports',    icon: '▣', label: 'REPORTS' },
