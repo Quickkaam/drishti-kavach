@@ -11,7 +11,6 @@ import { useTheme, ThemeToggleButton, ThemeStatus } from '../ui/ThemeToggle';
 import NotificationBell from '../ui/NotificationBell';
 import { Database, Bot, Cloud, Activity, LogOut } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
-import { useNavigate } from 'react-router-dom';
 
 const NAV = [
   { path: '/',            icon: '◈', label: 'OVERVIEW',        end: true },
