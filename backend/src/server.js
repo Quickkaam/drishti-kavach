@@ -42,6 +42,7 @@ const ipInfoRoutes = require('./routes/ipinfo');
 const integrationsRoutes = require('./routes/integrations');
 const analyticsRoutes = require('./routes/analytics');
 const mitreRoutes = require('./routes/mitre');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const server = http.createServer(app);
@@ -170,6 +171,7 @@ app.use('/api/ipinfo', ipInfoRoutes);
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/mitre', mitreRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────
 app.use((_req, res) => {

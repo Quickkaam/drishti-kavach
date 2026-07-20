@@ -8,8 +8,10 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import MobileNavigation from './MobileNavigation';
 import { useTheme, ThemeToggleButton, ThemeStatus } from '../ui/ThemeToggle';
+import NotificationBell from '../ui/NotificationBell';
 import { Database, Bot, Cloud, Activity, LogOut } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
+import { useNavigate } from 'react-router-dom';
 
 const NAV = [
   { path: '/',            icon: '◈', label: 'OVERVIEW',        end: true },
@@ -27,6 +29,7 @@ const NAV = [
   { path: '/users',      icon: '◎', label: 'USERS',       adminOnly: true },
   { path: '/credentials',icon: '🔑', label: 'CREDENTIALS', superAdminOnly: true },
   { path: '/audit',      icon: '≡', label: 'AUDIT LOG',   adminOnly: true },
+  { path: '/notifications', icon: '🔔', label: 'NOTIFICATIONS' },
   { path: '/settings',   icon: '⚙', label: 'SETTINGS' },
 ];
 
@@ -529,6 +532,9 @@ export default function DashboardLayout() {
               <Bot size={16} className="text-[#00d4ff]" title="Drishti AI: Active" />
               <Cloud size={16} className="text-[#00ff88]" title="Cloudflare: Linked" />
             </div>
+            
+            {/* Notification Bell */}
+            <NotificationBell onNotificationClick={() => navigate('/notifications')} />
             
             {/* Time */}
             <div style={{

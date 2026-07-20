@@ -1,6 +1,6 @@
 // ============================================
 // Drishti Kavach — WebSocket (Socket.io)
-// Real-time dashboard updates
+// Real-time dashboard updates and notifications
 // ============================================
 
 const jwt = require('jsonwebtoken');
@@ -24,9 +24,17 @@ function initSocketIO(io) {
   io.on('connection', (socket) => {
     console.log(`[WS] Connected: user ${socket.userId} (${socket.userRole})`);
 
+    // Join user-specific room for personal notifications
+    socket.join(`user:${socket.userId}`);
+
     // Join admin room if admin/analyst
-    if (['admin', 'analyst'].includes(socket.userRole)) {
+    if (['admin', 'superadmin', 'analyst'].includes(socket.userRole)) {
       socket.join('admin');
+    }
+
+    // Join superadmin room
+    if (socket.userRole === 'superadmin') {
+      socket.join('superadmin');
     }
 
     // Join website-specific room
@@ -47,6 +55,27 @@ function initSocketIO(io) {
   // Emit to all admins
   io.emitToAdmins = (event, data) => {
     io.to('admin').emit(event, data);
+  };
+
+  // Emit to specific user
+  io.emitToUser = (userId, event, data) => {
+    io.to(`user:${userId}`).emit(event, data);
+  };
+
+  // Emit notification to user
+  io.emitNotification = (userId, notification) => {
+    io.to(`user:${userId}`).emit('notification', notification);
+  };
+
+  // Emit notification to role
+  io.emitToRole = (role, event, data) => {
+    // Find all sockets with this role and emit
+    const sockets = io.sockets.sockets;
+    for (const socket of sockets.values()) {
+      if (socket.userRole === role) {
+        socket.emit(event, data);
+      }
+    }
   };
 
   return io;

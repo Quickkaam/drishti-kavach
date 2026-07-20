@@ -43,6 +43,7 @@ function generateMockIncident() {
 export const SocketProvider = ({ children }) => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [lastIncident, setLastIncident] = useState(null);
+  const [lastNotification, setLastNotification] = useState(null);
   const { token } = useAuth();
   const intervalRef = useRef(null);
 
@@ -77,8 +78,19 @@ export const SocketProvider = ({ children }) => {
     };
   }, [token]);
 
+  // Listen for real notifications from backend (when connected via real socket)
+  useEffect(() => {
+    // This would be enhanced with actual socket.io connection
+    // For now, we just handle mock incidents
+  }, []);
+
   return (
-    <SocketContext.Provider value={{ socket: null, connectionStatus, lastIncident }}>
+    <SocketContext.Provider value={{ 
+      socket: null, 
+      connectionStatus, 
+      lastIncident,
+      lastNotification
+    }}>
       {children}
     </SocketContext.Provider>
   );

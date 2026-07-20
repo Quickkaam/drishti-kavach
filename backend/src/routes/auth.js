@@ -11,6 +11,8 @@ const { validate, loginSchema } = require('../middleware/validate');
 const { requireAuth } = require('../middleware/auth');
 const { verifyTurnstile } = require('../middleware/turnstile');
 const { logAuthEvent, logError: logErrorLog } = require('../services/logging');
+const { notifyLogin, createDefaultPreferences, getNotificationPreferences } = require('../services/notifications');
+const { fetchIpInfo } = require('../utils/loginLogger');
 
 const router = express.Router();
 
@@ -139,6 +141,16 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
       success: true,
       userAgent: req.headers['user-agent']
     }).catch(err => console.error('[LOG LOGIN EVENT]', err));
+
+    // Send login notification
+    const location = await fetchIpInfo(req.ip);
+    notifyLogin(user, req.ip, location).catch(err => console.error('[LOGIN NOTIFICATION]', err));
+
+    // Ensure user has notification preferences
+    const existingPrefs = await getNotificationPreferences(user.id);
+    if (!existingPrefs) {
+      await createDefaultPreferences(user.id, user.role);
+    }
 
     res.json({
       token: access,

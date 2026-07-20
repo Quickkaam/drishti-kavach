@@ -50,7 +50,12 @@ router.get('/login', async (req, res) => {
     if (startDate) query = query.gte('created_at', startDate);
     if (endDate) query = query.lte('created_at', endDate);
 
-    const { data, count } = await query;
+    const { data, count, error } = await query;
+    
+    if (error) {
+      console.error('Login logs fetch error:', error);
+      return res.status(500).json({ error: 'Failed to fetch login logs', details: error.message });
+    }
 
     res.json({
       logs: data || [],
@@ -61,6 +66,39 @@ router.get('/login', async (req, res) => {
   } catch (err) {
     console.error('Login logs error:', err);
     res.status(500).json({ error: 'Failed to fetch login logs' });
+  }
+});
+
+// Get security/system audit logs (for Security tab)
+router.get('/security', async (req, res) => {
+  try {
+    const { action, page = 1, limit = 50, startDate, endDate } = req.query;
+    let query = supabase
+      .from('system_audit_logs')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
+
+    if (action) query = query.ilike('action', `%${action}%`);
+    if (startDate) query = query.gte('created_at', startDate);
+    if (endDate) query = query.lte('created_at', endDate);
+
+    const { data, count, error } = await query;
+    
+    if (error) {
+      console.error('Security logs fetch error:', error);
+      return res.status(500).json({ error: 'Failed to fetch security logs', details: error.message });
+    }
+
+    res.json({
+      logs: data || [],
+      total: count || 0,
+      page: parseInt(page),
+      totalPages: Math.ceil((count || 0) / limit),
+    });
+  } catch (err) {
+    console.error('Security logs error:', err);
+    res.status(500).json({ error: 'Failed to fetch security logs' });
   }
 });
 
@@ -79,7 +117,12 @@ router.get('/errors', async (req, res) => {
     if (startDate) query = query.gte('created_at', startDate);
     if (endDate) query = query.lte('created_at', endDate);
 
-    const { data, count } = await query;
+    const { data, count, error } = await query;
+    
+    if (error) {
+      console.error('Error logs fetch error:', error);
+      return res.status(500).json({ error: 'Failed to fetch error logs', details: error.message });
+    }
 
     res.json({
       logs: data || [],

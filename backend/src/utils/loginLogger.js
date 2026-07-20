@@ -76,7 +76,7 @@ async function logLoginEvent({ userId, email, ip, io }) {
     fs.appendFileSync(logFilePath, compressed);
     
     // Store in Supabase using the new login_logs table
-    await supabase.from('login_logs').insert({
+    const insertData = {
       user_id: userId,
       email,
       email_hash: crypto.createHash('sha512').update(email).digest('hex'),
@@ -86,7 +86,22 @@ async function logLoginEvent({ userId, email, ip, io }) {
       success: true,
       failure_reason: null,
       created_at: event.timestamp,
-    });
+    };
+    
+    console.log('[LOGIN LOGGER] Inserting login event:', { email, ip, userId });
+    
+    const { data, error } = await supabase.from('login_logs').insert(insertData).select();
+    
+    if (error) {
+      console.error('[LOGIN LOGGER] Failed to insert login event:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+    } else {
+      console.log('[LOGIN LOGGER] Successfully inserted login event, id:', data?.[0]?.id);
+    }
     
     // Emit real‑time admin event if socket provided
     if (io && typeof io.to === 'function') {

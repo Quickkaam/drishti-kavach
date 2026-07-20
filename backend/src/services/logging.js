@@ -145,22 +145,34 @@ async function logAuthEvent({
   try {
     const emailHash = crypto.createHash('sha512').update(email).digest('hex');
     
-    const { error } = await supabase
+    const insertData = {
+      user_id: userId,
+      email,
+      email_hash: emailHash,
+      ip_address: ip,
+      user_agent: userAgent,
+      success,
+      failure_reason: failureReason,
+      location: location ? JSON.stringify(location) : null,
+      created_at: new Date().toISOString(),
+    };
+    
+    console.log('[LOG AUTH] Attempting to insert:', { email, ip, success, userId });
+    
+    const { data, error } = await supabase
       .from('login_logs')
-      .insert({
-        user_id: userId,
-        email,
-        email_hash: emailHash,
-        ip_address: ip,
-        user_agent: userAgent,
-        success,
-        failure_reason: failureReason,
-        location: location ? JSON.stringify(location) : null,
-        created_at: new Date().toISOString(),
-      });
+      .insert(insertData)
+      .select();
     
     if (error) {
-      console.error('[LOG AUTH] Failed to insert auth log:', error.message);
+      console.error('[LOG AUTH] Failed to insert auth log:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+    } else {
+      console.log('[LOG AUTH] Successfully inserted auth log:', data?.[0]?.id);
     }
     
     return { success: !error, error };
