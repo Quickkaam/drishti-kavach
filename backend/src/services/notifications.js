@@ -11,8 +11,6 @@ const { logError: logErrorLog } = require('./logging');
 const ROLES = {
   SUPERADMIN: 'superadmin',
   ADMIN: 'admin',
-  ANALYST: 'analyst',
-  VIEWER: 'viewer',
   CLIENT: 'client'
 };
 
@@ -58,32 +56,17 @@ const ROLE_NOTIFICATION_RULES = {
     minSeverity: SEVERITY.INFO
   },
   [ROLES.ADMIN]: {
-    // Admin gets security, ddos, login, system, incidents
+    // Admin gets security, ddos, login, system, incidents, ai
     categories: [
       CATEGORIES.SECURITY,
       CATEGORIES.DDOS,
       CATEGORIES.LOGIN,
       CATEGORIES.SYSTEM,
       CATEGORIES.INCIDENTS,
-      CATEGORIES.AI
-    ],
-    minSeverity: SEVERITY.LOW
-  },
-  [ROLES.ANALYST]: {
-    // Analyst gets security, incidents, forms
-    categories: [
-      CATEGORIES.SECURITY,
-      CATEGORIES.INCIDENTS,
+      CATEGORIES.AI,
       CATEGORIES.FORMS
     ],
-    minSeverity: SEVERITY.MEDIUM
-  },
-  [ROLES.VIEWER]: {
-    // Viewer gets only system announcements
-    categories: [
-      CATEGORIES.SYSTEM
-    ],
-    minSeverity: SEVERITY.MEDIUM
+    minSeverity: SEVERITY.LOW
   },
   [ROLES.CLIENT]: {
     // Client gets only their own website notifications
@@ -171,26 +154,20 @@ async function createDefaultPreferences(userId, role) {
     };
     
     // Adjust defaults based on role
-    if (role === ROLES.VIEWER) {
-      defaults.email_security = false;
-      defaults.email_ddos = false;
-      defaults.email_ai = false;
-      defaults.slack_security = false;
-      defaults.slack_ddos = false;
-      defaults.telegram_security = false;
-      defaults.telegram_ddos = false;
-    } else if (role === ROLES.ANALYST) {
-      defaults.email_login = false;
-      defaults.slack_login = false;
-      defaults.telegram_login = false;
-    } else if (role === ROLES.CLIENT) {
+    if (role === ROLES.CLIENT) {
       defaults.email_system = false;
       defaults.email_ai = false;
       defaults.email_login = false;
+      defaults.email_ddos = false;
+      defaults.email_incidents = false;
       defaults.slack_system = false;
       defaults.slack_ai = false;
+      defaults.slack_login = false;
+      defaults.slack_ddos = false;
       defaults.telegram_system = false;
       defaults.telegram_ai = false;
+      defaults.telegram_login = false;
+      defaults.telegram_ddos = false;
     }
     
     const { data, error } = await supabase
