@@ -60,52 +60,35 @@ ALTER TABLE error_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for service_role (backend uses this)
-CREATE POLICY "service_role_all_access" ON login_logs
-  FOR ALL TO service_role
-  USING (true)
-  WITH CHECK (true);
-
-CREATE POLICY "service_role_all_access" ON error_logs
-  FOR ALL TO service_role
-  USING (true)
-  WITH CHECK (true);
-
-CREATE POLICY "service_role_all_access" ON system_audit_logs
-  FOR ALL TO service_role
-  USING (true)
-  WITH CHECK (true);
-
--- Create policies for authenticated users
-CREATE POLICY "authenticated_all_access" ON login_logs
-  FOR ALL TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
-CREATE POLICY "authenticated_all_access" ON error_logs
-  FOR ALL TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
-CREATE POLICY "authenticated_all_access" ON system_audit_logs
-  FOR ALL TO authenticated
-  USING (true)
-  WITH CHECK (true);
-
--- Create policies for anon users (if public access needed)
-CREATE POLICY "anon_all_access" ON login_logs
-  FOR ALL TO anon
-  USING (true)
-  WITH CHECK (true);
-
-CREATE POLICY "anon_all_access" ON error_logs
-  FOR ALL TO anon
-  USING (true)
-  WITH CHECK (true);
-
-CREATE POLICY "anon_all_access" ON system_audit_logs
-  FOR ALL TO anon
-  USING (true)
-  WITH CHECK (true);
+-- Using DO block to handle existing policies
+DO $$
+BEGIN
+  -- Drop existing policies first
+  DROP POLICY IF EXISTS "service_role_all_access" ON login_logs;
+  DROP POLICY IF EXISTS "service_role_all_access" ON error_logs;
+  DROP POLICY IF EXISTS "service_role_all_access" ON system_audit_logs;
+  DROP POLICY IF EXISTS "authenticated_all_access" ON login_logs;
+  DROP POLICY IF EXISTS "authenticated_all_access" ON error_logs;
+  DROP POLICY IF EXISTS "authenticated_all_access" ON system_audit_logs;
+  DROP POLICY IF EXISTS "anon_all_access" ON login_logs;
+  DROP POLICY IF EXISTS "anon_all_access" ON error_logs;
+  DROP POLICY IF EXISTS "anon_all_access" ON system_audit_logs;
+  
+  -- Create service_role policies
+  CREATE POLICY "service_role_all_access" ON login_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+  CREATE POLICY "service_role_all_access" ON error_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+  CREATE POLICY "service_role_all_access" ON system_audit_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+  
+  -- Create authenticated policies
+  CREATE POLICY "authenticated_all_access" ON login_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  CREATE POLICY "authenticated_all_access" ON error_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  CREATE POLICY "authenticated_all_access" ON system_audit_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+  
+  -- Create anon policies
+  CREATE POLICY "anon_all_access" ON login_logs FOR ALL TO anon USING (true) WITH CHECK (true);
+  CREATE POLICY "anon_all_access" ON error_logs FOR ALL TO anon USING (true) WITH CHECK (true);
+  CREATE POLICY "anon_all_access" ON system_audit_logs FOR ALL TO anon USING (true) WITH CHECK (true);
+END $$;
 
 -- ─── 6. VERIFY TABLES EXIST AND HAVE CORRECT STRUCTURE ──────────────
 SELECT 

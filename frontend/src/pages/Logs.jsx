@@ -48,6 +48,30 @@ const LogsPage = () => {
     return '-';
   };
 
+  // Get action display text based on tab and log type
+  const getActionDisplay = (log) => {
+    if (selectedTab === 'login') {
+      return log.success ? '🔐 User Login' : '❌ Login Failed';
+    }
+    if (selectedTab === 'errors') {
+      return log.error_type || log.level || 'Error';
+    }
+    // Security/System logs
+    return log.action || 'System Event';
+  };
+
+  // Get user display based on tab
+  const getUserDisplay = (log) => {
+    if (selectedTab === 'login') {
+      return log.email || log.user_id || 'Unknown';
+    }
+    if (selectedTab === 'errors') {
+      return log.user_id || 'System';
+    }
+    // Security/System logs
+    return log.changed_by || log.entity_type || 'System';
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -121,18 +145,27 @@ const LogsPage = () => {
                   {logs.map((log, index) => (
                     <tr key={index} className="hover:bg-gray-700/50">
                       <td className="px-6 py-4 text-sm text-gray-300 whitespace-nowrap">{formatDate(log.created_at || log.logged_at || log.timestamp)}</td>
-                      <td className="px-6 py-4 text-sm text-gray-300 whitespace-nowrap">{log.action || 'N/A'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-300 whitespace-nowrap">{getActionDisplay(log)}</td>
                       <td className="px-6 py-4 text-sm text-gray-300 whitespace-nowrap">
-                        {log.changed_by || 'N/A'}{log.ip_address && <div className="text-gray-500 text-xs">{log.ip_address}</div>}
+                        <div>{getUserDisplay(log)}</div>
+                        {log.ip_address && <div className="text-gray-500 text-xs">{log.ip_address}</div>}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-400 max-w-md">
-                        {selectedTab === 'login' && log.email && <div>Email: {log.email}</div>}
                         {selectedTab === 'login' && log.failure_reason && <div className="text-red-400">Reason: {log.failure_reason}</div>}
+                        {selectedTab === 'login' && log.location && <div className="text-gray-400">Location: {typeof log.location === 'string' ? log.location : JSON.stringify(log.location)}</div>}
                         {selectedTab === 'errors' && log.error_type && <div className="font-semibold">{log.error_type}</div>}
                         {selectedTab === 'errors' && log.message && <div className="truncate">{log.message.substring(0, 100)}</div>}
+                        {selectedTab === 'security' && log.old_values && <div className="text-xs">Old: {typeof log.old_values === 'string' ? log.old_values : JSON.stringify(log.old_values).substring(0, 50)}</div>}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatus(log)}
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          getStatus(log) === 'Success' ? 'bg-green-500/20 text-green-400' :
+                          getStatus(log) === 'Failed' ? 'bg-red-500/20 text-red-400' :
+                          getStatus(log) === 'Error' ? 'bg-orange-500/20 text-orange-400' :
+                          'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {getStatus(log)}
+                        </span>
                       </td>
                     </tr>
                   ))}
