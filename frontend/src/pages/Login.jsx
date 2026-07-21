@@ -229,14 +229,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo credentials */}
-          <div className="mt-6 p-4 border border-cyber-gold/20 bg-cyber-gold/5">
-            <p className="font-orbitron text-xs text-cyber-gold tracking-wider mb-2">◈ DEMO ACCESS</p>
-            <div className="font-mono-code text-xs text-text-secondary space-y-1">
-              <p>ID: <span className="text-cyber-cyan">demo@drishti.com</span></p>
-              <p>KEY: <span className="text-cyber-cyan">demo1234</span></p>
-            </div>
-          </div>
+
         </div>
 
         <p className="text-center font-orbitron text-xs tracking-widest text-text-muted mt-6">
