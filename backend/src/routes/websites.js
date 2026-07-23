@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const supabase = require('../db/supabase');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { validate, websiteSchema } = require('../middleware/validate');
+const encryption = require('../utils/encryption');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -31,10 +32,12 @@ router.post('/', requireRole('admin'), validate(websiteSchema), async (req, res)
   try {
     const { name, domain, client_id, settings } = req.body;
     const apiKey = generateApiKey();
+    const apiKeyEncrypted = encryption.encryptData(apiKey);
+    const apiKeyHash = encryption.hashData(apiKey);
 
     const { data, error } = await supabase
       .from('websites')
-      .insert({ name, domain, client_id, api_key: apiKey, settings })
+      .insert({ name, domain, client_id, api_key_encrypted: apiKeyEncrypted, api_key_hash: apiKeyHash, settings })
       .select()
       .single();
 
@@ -108,7 +111,10 @@ router.delete('/:id', requireRole('admin'), async (req, res) => {
 router.post('/:id/regenerate-key', requireRole('admin'), async (req, res) => {
   try {
     const newKey = generateApiKey();
-    await supabase.from('websites').update({ api_key: newKey }).eq('id', req.params.id);
+    const apiKeyEncrypted = encryption.encryptData(newKey);
+    const apiKeyHash = encryption.hashData(newKey);
+    
+    await supabase.from('websites').update({ api_key_encrypted: apiKeyEncrypted, api_key_hash: apiKeyHash }).eq('id', req.params.id);
 
     await supabase.from('audit_logs').insert({
       website_id: req.params.id,
@@ -129,11 +135,20 @@ router.get('/:id/snippet', async (req, res) => {
   try {
     const { data: website } = await supabase
       .from('websites')
-      .select('api_key, domain, name, settings')
+      .select('api_key_encrypted, domain, name, settings')
       .eq('id', req.params.id)
       .single();
 
     if (!website) return res.status(404).json({ error: 'Website not found' });
+
+    let decryptedKey = '';
+    if (website.api_key_encrypted) {
+      try {
+        decryptedKey = encryption.decryptData(website.api_key_encrypted);
+      } catch (err) {
+        console.error('Failed to decrypt API key for snippet:', err);
+      }
+    }
 
     const apiUrl = process.env.API_URL || 'https://your-api.onrender.com';
     const settings = website.settings || {};
@@ -143,7 +158,7 @@ router.get('/:id/snippet', async (req, res) => {
     let snippet = `<!-- Drishti Kavach SDK — दृष्टि कवच -->
 <script>
 (function(){
-  const DK = { apiKey: '${website.api_key}', api: '${apiUrl}/api/sdk' };
+  const DK = { apiKey: '${decryptedKey}', api: '${apiUrl}/api/sdk' };
   function send(type, data) {
     if(!navigator.sendBeacon) return;
     navigator.sendBeacon(DK.api + '/log',
@@ -231,12 +246,19 @@ router.post('/:id/upload', requireRole('admin'), async (req, res) => {
     // Fetch website and its API key
     const { data: website, error } = await supabase
       .from('websites')
-      .select('id, name, api_key, domain')
+      .select('id, name, api_key_encrypted, domain')
       .eq('id', websiteId)
       .single();
 
     if (error || !website) return res.status(404).json({ error: 'Website not found' });
-    if (!website.api_key) return res.status(400).json({ error: 'Website has no API key. Regenerate key first.' });
+    if (!website.api_key_encrypted) return res.status(400).json({ error: 'Website has no API key. Regenerate key first.' });
+
+    let decryptedKey = '';
+    try {
+      decryptedKey = encryption.decryptData(website.api_key_encrypted);
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to decrypt API key' });
+    }
 
     // Expect base64-encoded ZIP in body
     const { zipBase64 } = req.body;
@@ -248,7 +270,7 @@ router.post('/:id/upload', requireRole('admin'), async (req, res) => {
 
     // Process ZIP
     const ZipProcessor = require('../services/zipProcessor');
-    const processor = new ZipProcessor(website.api_key, websiteId);
+    const processor = new ZipProcessor(decryptedKey, websiteId);
     const result = await processor.process(zipBuffer);
 
     // Log integration
