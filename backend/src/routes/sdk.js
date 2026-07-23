@@ -236,9 +236,7 @@ router.post('/engagement', requireApiKey, async (req, res) => {
         });
 
         // Increment pages_visited count on session
-        await supabase.rpc('increment_session_page_count', { p_session_id: session_id })
-          .catch(() => {}); // Non-critical
-
+        await supabase.rpc('increment_session_page_count', { p_session_id: session_id });
         break;
       }
 
@@ -266,7 +264,7 @@ router.post('/engagement', requireApiKey, async (req, res) => {
           await supabase.rpc('update_session_duration', {
             p_session_id: session_id,
             p_duration:   duration,
-          }).catch(() => {});
+          });
         }
         break;
       }
