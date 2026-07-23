@@ -59,9 +59,11 @@ const requireRole = (...roles) => (req, res, next) => {
 };
 
 // Validate SDK API key (for client-side tracking)
+// Checks X-API-Key header first, falls back to api_key in body
+// (sendBeacon cannot send custom headers, so SDK includes key in body)
 const requireApiKey = async (req, res, next) => {
   try {
-    const apiKey = req.headers['x-api-key'];
+    const apiKey = req.headers['x-api-key'] || req.body?.api_key;
     if (!apiKey) {
       return res.status(401).json({ error: 'API key required' });
     }
