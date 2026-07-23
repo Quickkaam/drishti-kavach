@@ -37,8 +37,13 @@ export default function Websites() {
   };
 
   const getSnippet = async (id) => {
-    const { data } = await api.get(`/websites/${id}/snippet`);
-    setSnippetFor(data.snippet);
+    try {
+      const { data } = await api.get(`/websites/${id}/snippet`);
+      setSnippetFor(data.snippet);
+    } catch (e) {
+      console.error(e);
+      alert('Error fetching snippet: ' + (e.response?.data?.error || e.message));
+    }
   };
 
   const regenKey = async (id) => {
