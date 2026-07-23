@@ -170,11 +170,11 @@ router.get('/:id/snippet', async (req, res) => {
     if(!el) { el = document.createElement('meta'); el.setAttribute(attr, name); document.head.appendChild(el); }
     el.setAttribute('content', content);
   }
-  if('${seo.title}') document.title = '${seo.title.replace(/'/g, "\\'")}';
+  if('${seo.title || ''}') document.title = '${(seo.title || '').replace(/'/g, "\\'")}';
   setMeta('description', '${(seo.description || '').replace(/'/g, "\\'")}', false);
   setMeta('keywords', '${(seo.keywords || '').replace(/'/g, "\\'")}', false);
   setMeta('google-site-verification', '${(seo.google_verify || '').replace(/'/g, "\\'")}', false);
-  setMeta('og:title', '${seo.title ? seo.title.replace(/'/g, "\\'") : ''}', true);
+  setMeta('og:title', '${(seo.title || '').replace(/'/g, "\\'")}', true);
   setMeta('og:description', '${(seo.description || '').replace(/'/g, "\\'")}', true);`;
     }
 

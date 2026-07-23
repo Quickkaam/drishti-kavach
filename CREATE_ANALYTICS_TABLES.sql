@@ -3,6 +3,12 @@
 -- Run this in Supabase SQL Editor
 -- ============================================
 
+-- Drop old tables if they exist with wrong schema
+DROP TABLE IF EXISTS user_sessions CASCADE;
+DROP TABLE IF EXISTS page_views CASCADE;
+DROP TABLE IF EXISTS geographic_data CASCADE;
+DROP TABLE IF EXISTS device_analytics CASCADE;
+
 -- User Sessions Table
 CREATE TABLE IF NOT EXISTS user_sessions (
   id BIGSERIAL PRIMARY KEY,
