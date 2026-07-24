@@ -9,7 +9,8 @@ const { requireApiKey } = require('../middleware/auth');
 const { validate, sdkEventSchema } = require('../middleware/validate');
 const ddosService = require('../services/ddos');
 const securityService = require('../services/security');
-const { logIpEvent, getRealIpAddress } = require('../utils/loginLogger');
+const { logIpEvent, getRealIpAddress, fetchIpInfo } = require('../utils/loginLogger');
+
 
 const router = express.Router();
 
@@ -231,6 +232,14 @@ router.post('/engagement', requireApiKey, async (req, res) => {
           .single();
 
         if (!existing) {
+          // Fetch geolocation for this IP
+          let locationData = null;
+          try {
+            locationData = await fetchIpInfo(userIp);
+          } catch (geoErr) {
+            console.warn('[SDK SESSION] Geo lookup failed:', geoErr.message);
+          }
+
           const sessionData = {
             website_id:   websiteId,
             session_id,
@@ -240,6 +249,16 @@ router.post('/engagement', requireApiKey, async (req, res) => {
             landing_page: data.url || null,
             is_active:    true,
             started_at:   now,
+            // Store location fields including exact coordinates
+            ...(locationData ? {
+              city:         locationData.city    || null,
+              country:      locationData.country || null,
+              country_code: locationData.country_code || null,
+              isp:          locationData.isp     || null,
+              region:       locationData.region  || null,
+              latitude:     parseFloat(locationData.lat) || null,
+              longitude:    parseFloat(locationData.lon) || null,
+            } : {}),
           };
           
           const { data: session } = await supabase
@@ -259,10 +278,9 @@ router.post('/engagement', requireApiKey, async (req, res) => {
               user_ip:     userIp,
               user_agent:  userAgent,
               created_at:  now,
-              duration:    0, // Will be updated by time_on_page events
+              duration:    0,
             });
 
-            // Also call the RPC function to increment page count
             await supabase.rpc('increment_session_page_count', { p_session_id: session_id });
           }
         }
