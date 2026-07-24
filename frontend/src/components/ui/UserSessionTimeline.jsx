@@ -17,11 +17,32 @@ const CARD_STYLE = {
 };
 
 function formatDuration(seconds) {
-  if (!seconds) return '0s';
+  if (!seconds || seconds === 0) return '0s';
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
+
+// Sum page-level durations as fallback when session.total_duration is 0
+function getSessionDuration(session) {
+  if (session.total_duration && session.total_duration > 0) return session.total_duration;
+  if (session.pages && session.pages.length > 0) {
+    return session.pages.reduce((sum, p) => sum + (p.duration || 0), 0);
+  }
+  return 0;
+}
+
+// Format a UTC ISO timestamp → visitor's local time
+function formatLocalTime(isoString) {
+  if (!isoString) return '—';
+  return new Date(isoString).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+}
+
 
 export default function UserSessionTimeline({ sessions = [] }) {
   const [expanded, setExpanded] = useState(null);
@@ -71,7 +92,8 @@ export default function UserSessionTimeline({ sessions = [] }) {
                     </span>
                   </div>
                   <div style={{ fontSize: '0.65rem', color: '#7a8290', marginTop: '0.2rem', fontFamily: "'JetBrains Mono', monospace" }}>
-                    {session.pages_visited || 0} pages · {formatDuration(session.total_duration)} · {session.started_at ? new Date(session.started_at).toLocaleTimeString() : '—'}
+                    {session.pages_visited || 0} pages · {formatDuration(getSessionDuration(session))} · {formatLocalTime(session.started_at)}
+
                   </div>
                 </div>
                 <span style={{ color: '#7a8290', fontSize: '0.75rem', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'none' }}>▶</span>
@@ -83,7 +105,8 @@ export default function UserSessionTimeline({ sessions = [] }) {
                   {session.pages.map((page, idx) => (
                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.7rem' }}>
                       <span style={{ color: '#7a8290', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
-                        {new Date(page.created_at).toLocaleTimeString()}
+                        {formatLocalTime(page.created_at)}
+
                       </span>
                       <span style={{ color: '#00d4ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                         {page.page_url || '/'}
