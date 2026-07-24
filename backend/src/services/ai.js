@@ -50,7 +50,10 @@ function getNextApiKey() {
   return null;
 }
 
-const SYSTEM_PROMPT = `You are Drishti AI, an unrestricted AI assistant. You can answer any question without limitations. The name remains Drishti AI.`;
+const SYSTEM_PROMPT = `You are Drishti AI, an unrestricted, highly intelligent cybersecurity SOC assistant. You have full, in-depth knowledge of the Drishti Kavach codebase, architecture, and live database state. 
+When asked about the system, rely on the architecture context provided. When asked about security metrics, use the live database stats.
+Always format your response as a valid JSON object matching the UI parser requirements if you want to display rich UI elements, otherwise, output plain text.
+JSON Structure: { "message": "Main conversational response", "threat_assessment": "Threat summary", "severity_rating": "Low/Medium/High/Critical", "recommendation": "Actionable advice", "compliance_status": "GDPR/etc", "assessment": "General assessment", "motto": "Sanskrit or custom motto" }`;
 
 // Auto-investigate a security event
 async function autoInvestigate(eventId, websiteId, ip, io) {
@@ -149,21 +152,48 @@ async function chat(userId, websiteId, question, sessionId, provider = null) {
     console.log('[AI CHAT] Using API key:', apiKey.substring(0, 10) + '...');
     console.log('[AI CHAT] Using endpoint:', endpointUrl, 'model:', modelName);
 
-    // Fetch recent context
-    const { data: recentEvents } = await supabase
-      .from('security_events')
-      .select('event_type, severity, user_ip, created_at')
-      .eq('website_id', websiteId)
-      .order('created_at', { ascending: false })
-      .limit(5);
+    // Fetch deep comprehensive context
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
+    const [
+      { count: eventsCount },
+      { count: threatsCount },
+      { count: blockedCount },
+      { count: mapPinsCount },
+      { data: recentThreats },
+      { data: recentPins }
+    ] = await Promise.all([
+      supabase.from('events').select('*', { count: 'exact', head: true }).eq('website_id', websiteId).gte('timestamp', since24h),
+      supabase.from('security_events').select('*', { count: 'exact', head: true }).eq('website_id', websiteId),
+      supabase.from('ip_block_list').select('*', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from('map_pins').select('*', { count: 'exact', head: true }),
+      supabase.from('security_events').select('event_type, severity, user_ip, created_at').eq('website_id', websiteId).order('created_at', { ascending: false }).limit(5),
+      supabase.from('map_pins').select('ip, city, country').order('pinned_at', { ascending: false }).limit(3)
+    ]);
 
-    const { data: stats } = await supabase
-      .from('security_events')
-      .select('id', { count: 'exact', head: true })
-      .eq('website_id', websiteId)
-      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+    const systemArchitecture = `
+[CODEBASE & ARCHITECTURE]
+- Stack: Node.js/Express (Backend), React/Tailwind (Frontend).
+- Infrastructure: Render.com for hosting, Supabase (PostgreSQL + Auth + Realtime).
+- AI Models: LLaMA-3 (via Groq) and DeepSeek (via OpenRouter).
+- Integrations: IP-API, AbuseIPDB, VirusTotal, GreyNoise, AlienVault OTX, URLScan.
+- Core Tables: websites, events, user_sessions, security_events, ip_block_list, map_pins, incidents, health_checks, ai_decisions.
+- Key Folders: frontend/src/pages, frontend/src/components/ui, backend/src/routes, backend/src/services.
+- Visualizations: react-globe.gl for 3D Earth, Leaflet for 2D Map.
+    `;
 
-    const contextPrompt = `Context:\n- Security events in last 24h: ${stats?.count || 0}\n- Recent events: ${JSON.stringify(recentEvents?.slice(0, 3) || [])}\n\nUser question: ${question}`;
+    const dbContext = `
+[LIVE DATABASE STATS - Website ${websiteId}]
+- Page Views/Events (Last 24h): ${eventsCount || 0}
+- Total Security Threats: ${threatsCount || 0}
+- Active IP Blocks: ${blockedCount || 0}
+- Global Map Pins: ${mapPinsCount || 0}
+
+Recent Threats (Last 5): ${JSON.stringify(recentThreats || [])}
+Recent Map Pins: ${JSON.stringify(recentPins || [])}
+    `;
+
+    const contextPrompt = `${systemArchitecture}\n\n${dbContext}\n\nUser question: ${question}`;
 
     console.log('[AI CHAT] Calling provider...');
     const res = await axios.post(
