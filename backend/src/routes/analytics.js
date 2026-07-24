@@ -233,6 +233,61 @@ router.get('/website/:id/sessions', requireAuth, async (req, res) => {
       .order('started_at', { ascending: false })
       .limit(limit);
 
+    // --- Start Backfill Logic ---
+    // Find sessions that have an IP but are missing latitude/longitude
+    const missingGeoSessions = (sessions || []).filter(
+      s => s.user_ip && s.user_ip !== '::1' && s.user_ip !== '127.0.0.1' && (s.latitude === null || s.longitude === null)
+    );
+
+    if (missingGeoSessions.length > 0) {
+      try {
+        const uniqueIpsToFetch = [...new Set(missingGeoSessions.map(s => s.user_ip))];
+        // ip-api.com batch endpoint (HTTP is fine here since it's backend-to-backend)
+        const batchReq = uniqueIpsToFetch.map(ip => ({ query: ip, fields: "lat,lon,city,country,countryCode,isp,regionName,query" }));
+        
+        const fetch = (await import('node-fetch')).default || require('node-fetch');
+        const ipRes = await fetch('http://ip-api.com/batch', {
+          method: 'POST',
+          body: JSON.stringify(batchReq),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const ipData = await ipRes.json();
+
+        const updates = [];
+        for (const session of missingGeoSessions) {
+          const geo = ipData.find(d => d.query === session.user_ip);
+          if (geo && geo.lat && geo.lon) {
+            // Update the session object in memory so it's returned to the client immediately
+            session.latitude = parseFloat(geo.lat);
+            session.longitude = parseFloat(geo.lon);
+            session.city = geo.city || session.city;
+            session.country = geo.country || session.country;
+            session.country_code = geo.countryCode || session.country_code;
+            session.isp = geo.isp || session.isp;
+            session.region = geo.regionName || session.region;
+
+            // Prepare for DB update
+            updates.push(
+              supabase.from('user_sessions').update({
+                latitude: session.latitude,
+                longitude: session.longitude,
+                city: session.city,
+                country: session.country,
+                country_code: session.country_code,
+                isp: session.isp,
+                region: session.region,
+              }).eq('id', session.id)
+            );
+          }
+        }
+        // Fire and forget DB updates
+        Promise.allSettled(updates).catch(e => console.error('Failed to backfill session geo', e));
+      } catch (err) {
+        console.error('[ANALYTICS SESSIONS] Failed to backfill geo locations:', err.message);
+      }
+    }
+    // --- End Backfill Logic ---
+
     // Get pages for each session
     const enriched = await Promise.all((sessions || []).map(async (s) => {
       const { data: pages } = await supabase
