@@ -3,24 +3,7 @@ import Globe from 'react-globe.gl';
 import { useSocket } from '../../context/SocketContext';
 import RouteMap from './RouteMap';
 
-// Pre-seeded threat arcs for demo (lat/lng of source → Mumbai server)
-const INITIAL_ARCS = [
-  { startLat: 39.9042, startLng: 116.4074, endLat: 19.076, endLng: 72.877, color: '#ff3d3d', label: 'CN — 103.21.244.10', severity: 'critical' },
-  { startLat: 55.7558, startLng: 37.6173, endLat: 19.076, endLng: 72.877, color: '#ff6b00', label: 'RU — 185.220.101.45', severity: 'high'     },
-  { startLat: 40.7128, startLng: -74.006, endLat: 19.076, endLng: 72.877, color: '#f5b041', label: 'US — 46.161.27.151',  severity: 'medium'   },
-  { startLat: 52.52,   startLng: 13.405,  endLat: 19.076, endLng: 72.877, color: '#ff6b00', label: 'DE — 91.92.128.33',   severity: 'high'     },
-  { startLat: -23.55,  startLng: -46.63,  endLat: 19.076, endLng: 72.877, color: '#f5b041', label: 'BR — 200.10.55.3',    severity: 'medium'   },
-];
-
-// Pin points on globe
-const INITIAL_POINTS = INITIAL_ARCS.map(a => ({
-  lat: a.startLat, lng: a.startLng,
-  size: a.severity === 'critical' ? 0.6 : 0.4,
-  color: a.color,
-  label: a.label,
-}));
-
-// View mode options
+// Map style options
 const VIEW_MODES = {
   globe: { name: 'Globe' },
   map:   { name: 'Map' },
@@ -56,20 +39,26 @@ const MAP_STYLES = {
 
 export default function LiveGlobe() {
   const globeRef = useRef();
-  const [arcsData, setArcsData] = useState(INITIAL_ARCS);
-  const [pointsData, setPointsData] = useState(INITIAL_POINTS);
+  const [arcsData, setArcsData] = useState([]);
+  const [pointsData, setPointsData] = useState([]);
+  
+  // Visitor arrays
+  const [visitorArcs, setVisitorArcs] = useState([]);
+  const [visitorPoints, setVisitorPoints] = useState([]);
+  
   const [viewMode, setViewMode] = useState('globe');
+  const [trafficType, setTrafficType] = useState('attack'); // 'attack' or 'visitor'
   const [mapStyle, setMapStyle] = useState('dark');
-  const { lastIncident, connectionStatus } = useSocket();
+  const { lastIncident, visitorEvent, connectionStatus } = useSocket();
 
   // Server location — Mumbai
   const SERVER = { lat: 19.076, lng: 72.877 };
 
-  // React to live incidents
+  // React to live incidents (Attacks)
   useEffect(() => {
     if (lastIncident && lastIncident.source_ip) {
-      const lat = lastIncident.latitude  || (Math.random() - 0.5) * 140;
-      const lng = lastIncident.longitude || (Math.random() - 0.5) * 340;
+      const lat = lastIncident.latitude || 0;
+      const lng = lastIncident.longitude || 0;
       const isCritical = lastIncident.severity === 'critical' || lastIncident.severity === 'high';
       const color = isCritical ? '#ff3d3d' : '#f5b041';
 
@@ -82,10 +71,30 @@ export default function LiveGlobe() {
       };
       const newPoint = { lat, lng, size: isCritical ? 0.6 : 0.4, color, label: lastIncident.source_ip };
 
-      setArcsData(prev => [...prev.slice(-20), newArc]);
-      setPointsData(prev => [...prev.slice(-20), newPoint]);
+      setArcsData(prev => [...prev.slice(-49), newArc]); // Keep last 50
+      setPointsData(prev => [...prev.slice(-49), newPoint]);
     }
   }, [lastIncident]);
+
+  // React to live visitor events
+  useEffect(() => {
+    if (visitorEvent && visitorEvent.ip) {
+      const lat = visitorEvent.latitude || 0;
+      const lng = visitorEvent.longitude || 0;
+      const color = '#00d4ff'; // Blue for normal traffic
+
+      const newArc = {
+        startLat: lat, startLng: lng,
+        endLat: SERVER.lat, endLng: SERVER.lng,
+        color,
+        label: visitorEvent.ip,
+      };
+      const newPoint = { lat, lng, size: 0.3, color, label: visitorEvent.ip };
+
+      setVisitorArcs(prev => [...prev.slice(-49), newArc]);
+      setVisitorPoints(prev => [...prev.slice(-49), newPoint]);
+    }
+  }, [visitorEvent]);
 
   // Globe init: auto-rotate, focus on India
   useEffect(() => {
@@ -138,6 +147,32 @@ export default function LiveGlobe() {
               </button>
             ))}
           </div>
+
+          {/* Traffic Type Toggle */}
+          <div className="flex items-center gap-1 border-r border-royal-700/30 pr-2 pl-1">
+            <button
+              onClick={() => setTrafficType('attack')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
+                trafficType === 'attack'
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_5px_#ef4444]" />
+              Attacks
+            </button>
+            <button
+              onClick={() => setTrafficType('visitor')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
+                trafficType === 'visitor'
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_5px_#22d3ee]" />
+              Visitors
+            </button>
+          </div>
           
           {/* Map Styles */}
           <div className="flex items-center gap-1 pl-1">
@@ -158,21 +193,23 @@ export default function LiveGlobe() {
         </div>
       </div>
 
-      {/* ── ATTACK COUNTER BADGES ── */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col gap-1.5">
-        {[
-          { label: 'CRITICAL', count: severityCount.critical, color: '#ff3d3d' },
-          { label: 'HIGH',     count: severityCount.high,     color: '#ff6b00' },
-          { label: 'MEDIUM',   count: severityCount.medium,   color: '#f5b041' },
-        ].map(({ label, count, color }) => (
-          <div key={label} className="flex items-center gap-2 px-2 py-1 rounded"
-               style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: color, boxShadow: `0 0 5px ${color}` }} />
-            <span className="font-orbitron text-[9px] tracking-widest" style={{ color }}>{label}</span>
-            <span className="font-orbitron text-[10px] font-bold ml-auto" style={{ color }}>{count}</span>
-          </div>
-        ))}
-      </div>
+      {/* ── ATTACK COUNTER BADGES (Only in Attack mode) ── */}
+      {trafficType === 'attack' && (
+        <div className="absolute top-4 right-4 z-20 flex flex-col gap-1.5">
+          {[
+            { label: 'CRITICAL', count: severityCount.critical, color: '#ff3d3d' },
+            { label: 'HIGH',     count: severityCount.high,     color: '#ff6b00' },
+            { label: 'MEDIUM',   count: severityCount.medium,   color: '#f5b041' },
+          ].map(({ label, count, color }) => (
+            <div key={label} className="flex items-center gap-2 px-2 py-1 rounded"
+                 style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: color, boxShadow: `0 0 5px ${color}` }} />
+              <span className="font-orbitron text-[9px] tracking-widest" style={{ color }}>{label}</span>
+              <span className="font-orbitron text-[10px] font-bold ml-auto" style={{ color }}>{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── GLOBE OR MAP ── */}
       <div className="absolute inset-0 flex items-center justify-center cursor-grab active:cursor-grabbing">
@@ -186,7 +223,7 @@ export default function LiveGlobe() {
             bumpImageUrl={currentStyle.bumpImageUrl}
             atmosphereColor={currentStyle.atmosphereColor}
             atmosphereAltitude={0.15}
-            arcsData={arcsData}
+            arcsData={trafficType === 'attack' ? arcsData : visitorArcs}
             arcColor="color"
             arcDashLength={0.4}
             arcDashGap={0.15}
@@ -195,7 +232,7 @@ export default function LiveGlobe() {
             arcStroke={0.6}
             arcAltitude={0.3}
             arcLabel="label"
-            pointsData={pointsData}
+            pointsData={trafficType === 'attack' ? pointsData : visitorPoints}
             pointColor="color"
             pointAltitude={0.01}
             pointRadius="size"
@@ -212,7 +249,7 @@ export default function LiveGlobe() {
             customThreeObjectUpdate={(obj, d) => {}}
           />
         ) : (
-          <RouteMap arcsData={arcsData} mapStyle={mapStyle} />
+          <RouteMap arcsData={trafficType === 'attack' ? arcsData : visitorArcs} mapStyle={mapStyle} />
         )}
       </div>
 
@@ -235,7 +272,7 @@ export default function LiveGlobe() {
       {/* ── ARC COUNT ── */}
       <div className="absolute bottom-4 right-4 z-20">
         <span className="font-orbitron text-[9px] tracking-widest text-[#00d4ff] opacity-60">
-          {arcsData.length} ACTIVE VECTORS
+          {trafficType === 'attack' ? arcsData.length : visitorArcs.length} ACTIVE VECTORS
         </span>
       </div>
     </div>

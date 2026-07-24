@@ -10,12 +10,6 @@ export default function DrishtiAIConsole() {
       sender: 'ai', 
       text: 'Drishti AI initialized. I am monitoring global traffic anomalies. How can I assist you today?',
       actions: []
-    },
-    {
-      id: 2,
-      sender: 'ai',
-      text: 'Alert: Detected a high volume of SQLi attempts from 185.220.101.45 targeting the login endpoint.',
-      actions: ['Block IP', 'Ignore']
     }
   ]);
   const messagesEndRef = useRef(null);

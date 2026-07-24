@@ -2,16 +2,8 @@ import React from 'react';
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
 
 export default function SystemHealthDashboard({ trends = [] }) {
-  // Mock data if trends is empty
-  const data = trends.length > 0 ? trends : [
-    { time: '10:00', load: 20 },
-    { time: '10:10', load: 25 },
-    { time: '10:20', load: 40 },
-    { time: '10:30', load: 30 },
-    { time: '10:40', load: 60 },
-    { time: '10:50', load: 45 },
-    { time: '11:00', load: 35 },
-  ];
+  // If no trends data is available, pass an empty array to show zero load
+  const data = trends.length > 0 ? trends : [];
 
   return (
     <div className="glass-panel rounded-lg p-4 bg-[#0a0a2e]/60 flex flex-col gap-4">

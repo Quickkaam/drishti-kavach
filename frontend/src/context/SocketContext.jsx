@@ -5,90 +5,92 @@ const SocketContext = createContext({});
 
 export const useSocket = () => useContext(SocketContext);
 
-// Attack source coordinates for realistic demo data
-const ATTACK_SOURCES = [
-  { lat: 39.9, lng: 116.4, country: 'CN' },
-  { lat: 55.75, lng: 37.62, country: 'RU' },
-  { lat: 40.71, lng: -74.0, country: 'US' },
-  { lat: 52.52, lng: 13.41, country: 'DE' },
-  { lat: -23.55, lng: -46.63, country: 'BR' },
-  { lat: 35.68, lng: 139.69, country: 'JP' },
-  { lat: 51.51, lng: -0.13, country: 'GB' },
-  { lat: 48.86, lng: 2.35, country: 'FR' },
-  { lat: 37.57, lng: 126.98, country: 'KR' },
-  { lat: -33.87, lng: 151.21, country: 'AU' },
-];
+import { io } from 'socket.io-client';
 
-const EVENT_TYPES = [
-  'sqli_attempt', 'xss_injection', 'brute_force', 'path_traversal',
-  'honeypot_trigger', 'rate_limit_exceeded', 'bot_detected', 'credential_stuffing',
-];
+// Map of recent IPs to prevent duplicate globe events in short bursts
+const recentIps = new Set();
 
-function generateMockIncident() {
-  const src = ATTACK_SOURCES[Math.floor(Math.random() * ATTACK_SOURCES.length)];
-  const severity = Math.random() > 0.85 ? 'critical' : Math.random() > 0.5 ? 'high' : 'medium';
-  return {
-    id: Date.now(),
-    severity,
-    event_type: EVENT_TYPES[Math.floor(Math.random() * EVENT_TYPES.length)],
-    user_ip: `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-    source_ip: `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-    created_at: new Date().toISOString(),
-    latitude: src.lat + (Math.random() - 0.5) * 10,
-    longitude: src.lng + (Math.random() - 0.5) * 10,
-    country: src.country,
-  };
-}
 
 export const SocketProvider = ({ children }) => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [lastIncident, setLastIncident] = useState(null);
   const [lastNotification, setLastNotification] = useState(null);
   const { token } = useAuth();
-  const intervalRef = useRef(null);
+  const [socket, setSocket] = useState(null);
+  const [visitorEvent, setVisitorEvent] = useState(null); // New state for visitors
 
   useEffect(() => {
-    // Cleanup previous interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
     if (!token) {
+      if (socket) {
+        socket.disconnect();
+        setSocket(null);
+      }
       setConnectionStatus('disconnected');
       return;
     }
 
-    // Start mock incident generator for the globe visualization
-    setConnectionStatus('connected');
-    
-    // Send first incident immediately after a short delay
-    const initTimer = setTimeout(() => {
-      setLastIncident(generateMockIncident());
-    }, 2000);
+    // Connect to backend
+    const backendUrl = import.meta.env.VITE_API_URL || 'https://drishti-kavach-backend.onrender.com';
+    const newSocket = io(backendUrl, {
+      withCredentials: true,
+      transports: ['websocket', 'polling'] // Try websocket first
+    });
 
-    // Then generate one every 8 seconds
-    intervalRef.current = setInterval(() => {
-      setLastIncident(generateMockIncident());
-    }, 8000);
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      setConnectionStatus('connected');
+      // Admin dashboard listens to all websites or admin room
+      newSocket.emit('join_admin'); 
+    });
+
+    newSocket.on('disconnect', () => {
+      setConnectionStatus('disconnected');
+    });
+
+    // Real-time security attacks
+    newSocket.on('security_alert', (data) => {
+      setLastIncident({
+        id: Date.now(),
+        severity: data.severity || 'high',
+        event_type: data.event_type || 'attack',
+        user_ip: data.ip || 'UNKNOWN',
+        source_ip: data.ip || 'UNKNOWN',
+        created_at: new Date().toISOString(),
+        latitude: data.location?.lat ? parseFloat(data.location.lat) : 0,
+        longitude: data.location?.lon ? parseFloat(data.location.lon) : 0,
+        country: data.location?.country_code || 'UN',
+      });
+    });
+
+    // Real-time normal visitor traffic
+    newSocket.on('ip_event', (data) => {
+      // Prevent flood of globe animations for the same user repeatedly
+      if (recentIps.has(data.ip)) return;
+      recentIps.add(data.ip);
+      setTimeout(() => recentIps.delete(data.ip), 10000); // 10 sec cooldown per IP
+
+      setVisitorEvent({
+        id: Date.now(),
+        ip: data.ip || 'UNKNOWN',
+        event_type: data.eventType || 'visit',
+        latitude: data.location?.lat ? parseFloat(data.location.lat) : 0,
+        longitude: data.location?.lon ? parseFloat(data.location.lon) : 0,
+        country: data.location?.country_code || 'UN',
+      });
+    });
 
     return () => {
-      clearTimeout(initTimer);
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      newSocket.disconnect();
     };
   }, [token]);
 
-  // Listen for real notifications from backend (when connected via real socket)
-  useEffect(() => {
-    // This would be enhanced with actual socket.io connection
-    // For now, we just handle mock incidents
-  }, []);
-
   return (
     <SocketContext.Provider value={{ 
-      socket: null, 
+      socket, 
       connectionStatus, 
-      lastIncident,
+      lastIncident, // For attacks
+      visitorEvent, // For normal visits
       lastNotification
     }}>
       {children}
