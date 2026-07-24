@@ -74,19 +74,45 @@ export default function LiveGlobe() {
   // Server location — Mumbai
   const SERVER = { lat: 19.076, lng: 72.877 };
 
-  // Fetch historical sessions to pre-populate the globe on mount
+  // Fetch historical sessions and exact IPs to pre-populate the globe on mount
   useEffect(() => {
     api.get('/analytics/website/1/sessions?limit=50')
-      .then(res => {
+      .then(async res => {
         const sessions = res.data;
         if (!sessions || !Array.isArray(sessions)) return;
+
+        // Extract unique valid IPs to fetch exact coordinates
+        const uniqueIps = [...new Set(sessions.map(s => s.user_ip).filter(ip => ip && ip !== '::1' && ip !== '127.0.0.1'))];
+        
+        let exactLocations = {};
+        
+        try {
+          if (uniqueIps.length > 0) {
+            // Use batch IP lookup to get exact coordinates
+            const batchReq = uniqueIps.map(ip => ({ query: ip, fields: "lat,lon,query" }));
+            const ipRes = await fetch('http://ip-api.com/batch', {
+              method: 'POST',
+              body: JSON.stringify(batchReq)
+            });
+            const ipData = await ipRes.json();
+            ipData.forEach(d => {
+              if (d && d.lat && d.lon) {
+                exactLocations[d.query] = { lat: d.lat, lng: d.lon };
+              }
+            });
+          }
+        } catch (err) {
+          console.error('[LiveGlobe] Failed to fetch exact IP locations, falling back to country centers', err);
+        }
         
         const initialArcs = [];
         const initialPoints = [];
         
         sessions.forEach(session => {
-          // Use country code mapping for historical data
-          const coords = COUNTRY_COORDS[session.country_code] || { lat: (Math.random() - 0.5) * 140, lng: (Math.random() - 0.5) * 340 };
+          // Use exact coordinates if available, otherwise fallback to country center
+          const coords = exactLocations[session.user_ip] 
+                          || COUNTRY_COORDS[session.country_code] 
+                          || { lat: (Math.random() - 0.5) * 140, lng: (Math.random() - 0.5) * 340 };
           const color = '#00d4ff';
           
           initialArcs.push({
