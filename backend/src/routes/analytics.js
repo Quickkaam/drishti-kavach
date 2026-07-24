@@ -245,7 +245,6 @@ router.get('/website/:id/sessions', requireAuth, async (req, res) => {
         // ip-api.com batch endpoint (HTTP is fine here since it's backend-to-backend)
         const batchReq = uniqueIpsToFetch.map(ip => ({ query: ip, fields: "lat,lon,city,country,countryCode,isp,regionName,query" }));
         
-        const fetch = (await import('node-fetch')).default || require('node-fetch');
         const ipRes = await fetch('http://ip-api.com/batch', {
           method: 'POST',
           body: JSON.stringify(batchReq),

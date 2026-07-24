@@ -142,7 +142,6 @@ async function logIpEvent({
       user_ip: ipAddress,
       user_agent: userAgent,
       referrer: null,
-      location: JSON.stringify(location),
       session_id: session_id,
       page_url: page_url,
       timestamp: event.timestamp,
