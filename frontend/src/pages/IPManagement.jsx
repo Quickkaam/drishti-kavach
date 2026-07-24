@@ -570,7 +570,15 @@ export default function IPManagement() {
                       const originalText = btn.innerText;
                       btn.innerText = '📍 PINNING...';
                       try {
-                        await api.post('/security/simulate-pin', { ip: intel.ip, location: { lat: intel.latitude, lon: intel.longitude } });
+                        await api.post('/security/simulate-pin', { 
+                          ip: intel.ip, 
+                          location: { 
+                            lat: intel.latitude, 
+                            lon: intel.longitude,
+                            city: intel.city,
+                            country: intel.country
+                          } 
+                        });
                         btn.innerText = '✅ PINNED ON MAP';
                         setTimeout(() => btn.innerText = originalText, 3000);
                       } catch (err) {
