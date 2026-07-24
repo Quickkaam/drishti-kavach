@@ -10,13 +10,25 @@ const { logIpEvent } = require('../utils/loginLogger');
 const router = express.Router();
 router.use(requireAuth);
 
-// POST /api/security/simulate-pin — Send IP to globe
+// POST /api/security/simulate-pin — Send IP to globe and save to DB
 router.post('/simulate-pin', async (req, res) => {
   try {
     const { ip, location } = req.body;
     if (!ip) return res.status(400).json({ error: 'IP is required' });
 
-    // Emit live event to trigger the globe/map animation
+    // 1. Save to permanent map_pins table
+    if (location && location.lat && location.lon) {
+      await supabase.from('map_pins').upsert({
+        ip,
+        latitude: location.lat,
+        longitude: location.lon,
+        city: location.city || null,
+        country: location.country || null,
+        pinned_at: new Date().toISOString()
+      }, { onConflict: 'ip' });
+    }
+
+    // 2. Emit live event to trigger the globe/map animation instantly
     await logIpEvent({
       websiteId: '1', // Default or grab from context if multi-tenant
       ip,
@@ -24,9 +36,25 @@ router.post('/simulate-pin', async (req, res) => {
       io: req.app.get('io')
     });
 
-    res.json({ success: true, message: 'Sent to globe' });
+    res.json({ success: true, message: 'Pinned to globe and saved' });
   } catch (err) {
+    console.error('[SIMULATE PIN]', err.message);
     res.status(500).json({ error: 'Failed to pin IP' });
+  }
+});
+
+// GET /api/security/map-pins — Fetch all permanently pinned IPs
+router.get('/map-pins', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('map_pins')
+      .select('*')
+      .order('pinned_at', { ascending: false });
+    
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch map pins' });
   }
 });
 

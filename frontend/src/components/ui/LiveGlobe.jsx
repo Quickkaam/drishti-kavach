@@ -74,24 +74,26 @@ export default function LiveGlobe() {
   // Server location — Mumbai
   const SERVER = { lat: 19.076, lng: 72.877 };
 
-  // Fetch historical sessions — use real lat/lon stored in the database
+  // Fetch historical sessions & manually pinned IPs — use real lat/lon stored in the database
   useEffect(() => {
-    api.get('/analytics/website/1/sessions?limit=50')
-      .then(res => {
-        const sessions = res.data;
-        if (!sessions || !Array.isArray(sessions)) return;
+    Promise.all([
+      api.get('/analytics/website/1/sessions?limit=50'),
+      api.get('/security/map-pins')
+    ])
+      .then(([sessionsRes, pinsRes]) => {
+        const sessions = sessionsRes.data || [];
+        const pins = pinsRes.data || [];
         
         const initialArcs = [];
         const initialPoints = [];
         
+        // 1. Plot normal sessions (Blue)
         sessions.forEach(session => {
-          // Only plot sessions that have real coordinates from IP lookup
           const lat = parseFloat(session.latitude);
           const lng = parseFloat(session.longitude);
-          if (!lat || !lng || (lat === 0 && lng === 0)) return; // Skip sessions without real coordinates
+          if (!lat || !lng || (lat === 0 && lng === 0)) return; 
           
           const color = '#00d4ff';
-          
           initialArcs.push({
             startLat: lat, startLng: lng,
             endLat: SERVER.lat, endLng: SERVER.lng,
@@ -103,11 +105,30 @@ export default function LiveGlobe() {
             label: `${session.user_ip} — ${session.city || ''}, ${session.country || ''}`.trim(),
           });
         });
+
+        // 2. Plot manually pinned IPs (Purple/Pink to distinguish them)
+        pins.forEach(pin => {
+          const lat = parseFloat(pin.latitude);
+          const lng = parseFloat(pin.longitude);
+          if (!lat || !lng) return;
+          
+          const color = '#ff00ff'; // Distinct color for manual pins
+          initialArcs.push({
+            startLat: lat, startLng: lng,
+            endLat: SERVER.lat, endLng: SERVER.lng,
+            color,
+            label: `📍 PINNED: ${pin.ip} — ${pin.city || ''}, ${pin.country || ''}`.trim(),
+          });
+          initialPoints.push({
+            lat, lng, size: 0.5, color, // slightly larger point
+            label: `📍 PINNED: ${pin.ip} — ${pin.city || ''}, ${pin.country || ''}`.trim(),
+          });
+        });
         
         setVisitorArcs(initialArcs);
         setVisitorPoints(initialPoints);
       })
-      .catch(err => console.error('[LiveGlobe] Failed to fetch initial sessions', err));
+      .catch(err => console.error('[LiveGlobe] Failed to fetch initial data', err));
   }, []);
 
   // React to live incidents (Attacks)
