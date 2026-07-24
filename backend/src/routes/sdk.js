@@ -207,13 +207,17 @@ router.get('/config', requireApiKey, (_req, res) => {
 // ─────────────────────────────────────────────────────────────────
 router.post('/engagement', requireApiKey, async (req, res) => {
   try {
-    const { event_type, session_id, data = {} } = req.body;
+    const { event_type, session_id, website_id: bodyWebsiteId, data = {} } = req.body;
     if (!event_type || !session_id) return res.status(400).json({ error: 'Missing event_type or session_id' });
 
-    const websiteId = req.website.id;
+    // Use website_id from payload if provided, otherwise use from API key validation
+    const websiteId = bodyWebsiteId || req.website.id;
     const userIp    = getRealIpAddress(req);
     const userAgent = req.headers['user-agent'] || '';
     const now       = new Date().toISOString();
+    
+    // Debug log
+    console.log(`[SDK ENGAGEMENT] Received: ${event_type} for session ${session_id}, website ${websiteId}, IP ${userIp}`);
 
     switch (event_type) {
 
@@ -415,7 +419,13 @@ router.post('/engagement', requireApiKey, async (req, res) => {
 
     res.status(200).json({ ok: true });
   } catch (err) {
-    console.error('[SDK ENGAGEMENT]', err.message);
+    console.error('[SDK ENGAGEMENT ERROR]', err.message, {
+      event_type,
+      session_id,
+      websiteId,
+      userIp,
+      body: req.body,
+    });
     res.status(500).json({ error: 'Failed to track engagement' });
   }
 });
