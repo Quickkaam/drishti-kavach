@@ -74,60 +74,38 @@ export default function LiveGlobe() {
   // Server location — Mumbai
   const SERVER = { lat: 19.076, lng: 72.877 };
 
-  // Fetch historical sessions and exact IPs to pre-populate the globe on mount
+  // Fetch historical sessions — use real lat/lon stored in the database
   useEffect(() => {
     api.get('/analytics/website/1/sessions?limit=50')
-      .then(async res => {
+      .then(res => {
         const sessions = res.data;
         if (!sessions || !Array.isArray(sessions)) return;
-
-        // Extract unique valid IPs to fetch exact coordinates
-        const uniqueIps = [...new Set(sessions.map(s => s.user_ip).filter(ip => ip && ip !== '::1' && ip !== '127.0.0.1'))];
-        
-        let exactLocations = {};
-        
-        try {
-          if (uniqueIps.length > 0) {
-            // Use batch IP lookup to get exact coordinates
-            const batchReq = uniqueIps.map(ip => ({ query: ip, fields: "lat,lon,query" }));
-            const ipRes = await fetch('http://ip-api.com/batch', {
-              method: 'POST',
-              body: JSON.stringify(batchReq)
-            });
-            const ipData = await ipRes.json();
-            ipData.forEach(d => {
-              if (d && d.lat && d.lon) {
-                exactLocations[d.query] = { lat: d.lat, lng: d.lon };
-              }
-            });
-          }
-        } catch (err) {
-          console.error('[LiveGlobe] Failed to fetch exact IP locations, falling back to country centers', err);
-        }
         
         const initialArcs = [];
         const initialPoints = [];
         
         sessions.forEach(session => {
-          // Use exact coordinates if available, otherwise fallback to country center
-          const coords = exactLocations[session.user_ip] 
-                          || COUNTRY_COORDS[session.country_code] 
-                          || { lat: (Math.random() - 0.5) * 140, lng: (Math.random() - 0.5) * 340 };
+          // Only plot sessions that have real coordinates from IP lookup
+          const lat = parseFloat(session.latitude);
+          const lng = parseFloat(session.longitude);
+          if (!lat || !lng || (lat === 0 && lng === 0)) return; // Skip sessions without real coordinates
+          
           const color = '#00d4ff';
           
           initialArcs.push({
-            startLat: coords.lat, startLng: coords.lng,
+            startLat: lat, startLng: lng,
             endLat: SERVER.lat, endLng: SERVER.lng,
             color,
-            label: session.user_ip || 'UNKNOWN',
+            label: `${session.user_ip} — ${session.city || ''}, ${session.country || ''}`.trim(),
           });
           initialPoints.push({
-            lat: coords.lat, lng: coords.lng, size: 0.3, color, label: session.user_ip || 'UNKNOWN'
+            lat, lng, size: 0.3, color,
+            label: `${session.user_ip} — ${session.city || ''}, ${session.country || ''}`.trim(),
           });
         });
         
-        setVisitorArcs(initialArcs.reverse());
-        setVisitorPoints(initialPoints.reverse());
+        setVisitorArcs(initialArcs);
+        setVisitorPoints(initialPoints);
       })
       .catch(err => console.error('[LiveGlobe] Failed to fetch initial sessions', err));
   }, []);
@@ -157,17 +135,22 @@ export default function LiveGlobe() {
   // React to live visitor events
   useEffect(() => {
     if (visitorEvent && visitorEvent.ip) {
-      const lat = visitorEvent.latitude || 0;
-      const lng = visitorEvent.longitude || 0;
+      // location comes as { lat, lon, city, country, ... } from the backend socket
+      const loc = visitorEvent.location || {};
+      const lat = parseFloat(loc.lat) || 0;
+      const lng = parseFloat(loc.lon) || 0;
+      if (!lat && !lng) return; // Skip if no real coordinates
+      
       const color = '#00d4ff'; // Blue for normal traffic
+      const label = `${visitorEvent.ip} — ${loc.city || ''}, ${loc.country || ''}`.trim();
 
       const newArc = {
         startLat: lat, startLng: lng,
         endLat: SERVER.lat, endLng: SERVER.lng,
         color,
-        label: visitorEvent.ip,
+        label,
       };
-      const newPoint = { lat, lng, size: 0.3, color, label: visitorEvent.ip };
+      const newPoint = { lat, lng, size: 0.3, color, label };
 
       setVisitorArcs(prev => [...prev.slice(-49), newArc]);
       setVisitorPoints(prev => [...prev.slice(-49), newPoint]);
