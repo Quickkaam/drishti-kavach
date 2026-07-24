@@ -69,10 +69,17 @@ if (process.env.SENTRY_DSN) {
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: [
+      process.env.FRONTEND_URL || 'http://localhost:5173',
+      'https://drishti-kavach.vercel.app',
+      'https://quickkaam.in',
+      /\.quickkaam\.in$/i,
+      /localhost/i,
+    ],
     credentials: true,
   },
 });
+
 
 // ─── Middleware ───────────────────────────────────────────────
 app.use(helmet({
@@ -83,13 +90,16 @@ app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:5173',
     'https://drishti-kavach.vercel.app',
+    'https://quickkaam.in',
+    'https://www.quickkaam.in',
     /\.quickkaam\.in$/i,
     /localhost/i,
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'X-API-Key'],
 }));
+
 
 app.use(express.json({ limit: '50mb' }));  // Increased for ZIP upload base64 payloads
 app.use(express.urlencoded({ extended: true }));
