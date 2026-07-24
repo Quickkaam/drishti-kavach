@@ -16,6 +16,9 @@ const THRESHOLDS = {
   geo_spike_threshold: 70,
 };
 
+// Minimum requests required before ratio checks (prevents false positives on low traffic)
+const MIN_REQUESTS_THRESHOLD = 20;
+
 async function getThresholds() {
   const { data } = await supabase
     .from('assistant_settings')
@@ -39,19 +42,25 @@ async function checkTrafficSpike(websiteId, io) {
         .eq('website_id', websiteId).gte('timestamp', last60min),
     ]);
 
+    // Skip if not enough requests to make a meaningful comparison
+    if (lastHour < MIN_REQUESTS_THRESHOLD) {
+      console.log(`[DDoS SPIKE] Skipping - not enough requests (${lastHour} in last hour)`);
+      return;
+    }
+
     const recentPerMin = (recent || 0) / 5;
     const avgPerMin = (lastHour || 1) / 60;
     const ratio = recentPerMin / avgPerMin;
 
     const thresholds = await getThresholds();
 
-    if (ratio >= thresholds.traffic_spike_critical) {
+    if (ratio >= thresholds.traffic_spike_critical && recent >= 10) {
       await createDDoSEvent(websiteId, 'critical', 'traffic_spike', {
         ratio: ratio.toFixed(2),
         recent_per_min: recentPerMin,
         avg_per_min: avgPerMin,
       }, io);
-    } else if (ratio >= thresholds.traffic_spike_warning) {
+    } else if (ratio >= thresholds.traffic_spike_warning && recent >= 5) {
       await createDDoSEvent(websiteId, 'warning', 'traffic_spike', {
         ratio: ratio.toFixed(2),
         recent_per_min: recentPerMin,
