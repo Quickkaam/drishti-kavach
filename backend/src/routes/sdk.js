@@ -9,7 +9,7 @@ const { requireApiKey } = require('../middleware/auth');
 const { validate, sdkEventSchema } = require('../middleware/validate');
 const ddosService = require('../services/ddos');
 const securityService = require('../services/security');
-const { logIpEvent } = require('../utils/loginLogger');
+const { logIpEvent, getRealIpAddress } = require('../utils/loginLogger');
 
 const router = express.Router();
 
@@ -17,7 +17,7 @@ const router = express.Router();
 router.post('/log', requireApiKey, validate(sdkEventSchema), async (req, res) => {
   try {
     const { event_type, page_url, event_data, session_id, referrer } = req.body;
-    const userIp = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+    const userIp = getRealIpAddress(req);
     const userAgent = req.headers['user-agent'] || '';
 
     const event = {
@@ -76,7 +76,7 @@ router.post('/log', requireApiKey, validate(sdkEventSchema), async (req, res) =>
 router.post('/security', requireApiKey, async (req, res) => {
   try {
     const { type, level, payload, url } = req.body;
-    const userIp = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+    const userIp = getRealIpAddress(req);
     const userAgent = req.headers['user-agent'] || '';
 
     const secEvent = {
@@ -147,7 +147,7 @@ router.post('/security', requireApiKey, async (req, res) => {
 router.post('/form', requireApiKey, async (req, res) => {
   try {
     const { type, email, name, phone, services, message, data: formData } = req.body;
-    const userIp = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+    const userIp = getRealIpAddress(req);
 
     await supabase.from('form_submissions').insert({
       website_id: req.website.id,
@@ -211,7 +211,7 @@ router.post('/engagement', requireApiKey, async (req, res) => {
     if (!event_type || !session_id) return res.status(400).json({ error: 'Missing event_type or session_id' });
 
     const websiteId = req.website.id;
-    const userIp    = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
+    const userIp    = getRealIpAddress(req);
     const userAgent = req.headers['user-agent'] || '';
     const now       = new Date().toISOString();
 
