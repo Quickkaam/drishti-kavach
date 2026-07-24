@@ -35,9 +35,8 @@ const generateTokens = (userId, role) => {
 
 // POST /api/auth/login
 router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true }), async (req, res) => {
+  const { email, password } = req.body || {};
   try {
-    const { email, password } = req.body;
-
     console.log('Login attempt:', { email, passwordLength: password?.length });
     console.log('DEEPSEEK_API_KEY configured:', !!process.env.DEEPSEEK_API_KEY);
     console.log('DEEPSEEK_API_KEY_BACKUP configured:', !!process.env.DEEPSEEK_API_KEY_BACKUP);
@@ -126,11 +125,6 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
     }).eq('id', user.id);
 
     const { access, refresh } = generateTokens(user.id, user.role);
-
-    // Log the login event (email, IP, enriched location)
-    const { logLoginEvent } = require('../utils/loginLogger');
-    // req.io is attached in server.js middleware
-    logLoginEvent({ userId: user.id, email, req, io: req.io }).catch(console.error);
 
     // Log successful login to database
     await logAuthEvent({
