@@ -1,11 +1,12 @@
 // ============================================
-// Drishti Kavach — Login Logger Utility
+// Drishti Kavach — IP Logger Utility
+// ============================================
+// Logs IP addresses with location data for both login tracking and DDoS detection
 // ============================================
 
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-// const fetch = require('node-fetch'); // using global fetch
 const supabase = require('../db/supabase');
 const crypto = require('crypto');
 const { logAuthEvent } = require('../services/logging');
@@ -16,10 +17,14 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-const logFilePath = path.join(logsDir, 'login_events.jsonl.gz');
+const logFilePath = path.join(logsDir, 'ip_events.jsonl.gz');
 
-/** Fetch enriched IP info from ipinfo.io */
+/** Fetch enriched IP info from ipinfo.io or ip-api.com */
 async function fetchIpInfo(ip) {
+  if (!ip || ip === '::1' || ip === '127.0.0.1' || ip === 'localhost') {
+    return { country: 'Localhost', country_code: 'LO', city: 'Localhost', lat: 0, lon: 0 };
+  }
+  
   try {
     const token = process.env.IPINFO_API_KEY;
     // First try ipinfo.io
@@ -27,9 +32,18 @@ async function fetchIpInfo(ip) {
       const ipinfoRes = await fetch(`https://ipinfo.io/${ip}?token=${token}`);
       if (ipinfoRes.ok) {
         const data = await ipinfoRes.json();
-        // Basic sanity check – ensure we got a city or country
         if (data && (data.city || data.country)) {
-          return data;
+          return {
+            country: data.country || 'Unknown',
+            country_code: data.country_code || 'UN',
+            region: data.region || 'Unknown',
+            city: data.city || 'Unknown',
+            lat: data.loc ? data.loc.split(',')[0] : '0',
+            lon: data.loc ? data.loc.split(',')[1] : '0',
+            isp: data.isp || 'Unknown',
+            org: data.org || 'Unknown',
+            timezone: data.timezone || 'Unknown',
+          };
         }
       }
     }
@@ -38,13 +52,25 @@ async function fetchIpInfo(ip) {
     if (fallbackRes.ok) {
       const alt = await fallbackRes.json();
       if (alt && alt.status === 'success') {
-        return alt;
+        return {
+          country: alt.country || 'Unknown',
+          country_code: alt.countryCode || 'UN',
+          region: alt.regionName || 'Unknown',
+          city: alt.city || 'Unknown',
+          lat: alt.lat ? String(alt.lat) : '0',
+          lon: alt.lon ? String(alt.lon) : '0',
+          isp: alt.isp || 'Unknown',
+          org: alt.org || 'Unknown',
+          timezone: alt.timezone || 'Unknown',
+          proxy: alt.proxy || false,
+          hosting: alt.hosting || false,
+        };
       }
     }
-    return {};
+    return { country: 'Unknown', country_code: 'UN', city: 'Unknown', lat: '0', lon: '0' };
   } catch (e) {
-    console.error('fetchIpInfo error', e);
-    return {};
+    console.error('fetchIpInfo error for IP', ip, e);
+    return { country: 'Error', country_code: 'ER', city: 'Error', lat: '0', lon: '0' };
   }
 }
 
@@ -59,15 +85,26 @@ function compressJsonLine(obj) {
   });
 }
 
-/** Log login event: email, ip, enriched location, compressed storage, real‑time admin notify */
-async function logLoginEvent({ userId, email, ip, io }) {
+/** Log IP event with location data for analytics and security */
+async function logIpEvent({ 
+  websiteId, 
+  eventType, 
+  ip, 
+  userAgent = null, 
+  session_id = null,
+  page_url = null,
+  io = null
+}) {
   try {
     const location = await fetchIpInfo(ip);
     const event = {
-      user_id: userId,
-      email,
+      website_id: websiteId,
+      event_type: eventType,
       ip_address: ip,
-      location,
+      location: JSON.stringify(location),
+      user_agent: userAgent,
+      session_id: session_id,
+      page_url: page_url,
       timestamp: new Date().toISOString(),
     };
     
@@ -75,41 +112,57 @@ async function logLoginEvent({ userId, email, ip, io }) {
     const compressed = await compressJsonLine(event);
     fs.appendFileSync(logFilePath, compressed);
     
-    // Store in Supabase using the new login_logs table
+    // Store in Supabase - use events table for analytics
+    // Also create a separate ip_events table if needed for security tracking
     const insertData = {
-      user_id: userId,
-      email,
-      email_hash: crypto.createHash('sha512').update(email).digest('hex'),
-      ip_address: ip,
+      website_id: websiteId,
+      event_type: eventType,
+      user_ip: ip,
+      user_agent: userAgent,
+      referrer: null,
       location: JSON.stringify(location),
-      user_agent: null,
-      success: true,
-      failure_reason: null,
-      created_at: event.timestamp,
+      session_id: session_id,
+      page_url: page_url,
+      timestamp: event.timestamp,
     };
     
-    console.log('[LOGIN LOGGER] Inserting login event:', { email, ip, userId });
-    
-    const { data, error } = await supabase.from('login_logs').insert(insertData).select();
+    const { data, error } = await supabase
+      .from('events')
+      .insert(insertData)
+      .select('id')
+      .single();
     
     if (error) {
-      console.error('[LOGIN LOGGER] Failed to insert login event:', {
+      console.error('[IP LOGGER] Failed to insert event:', {
         message: error.message,
         details: error.details,
-        hint: error.hint,
-        code: error.code
       });
     } else {
-      console.log('[LOGIN LOGGER] Successfully inserted login event, id:', data?.[0]?.id);
+      console.log('[IP LOGGER] Successfully logged event:', { eventType, ip, eventId: data?.id });
     }
     
-    // Emit real‑time admin event if socket provided
+    // Emit real-time event if socket provided
     if (io && typeof io.to === 'function') {
-      io.to('superadmin').emit('login_event', event);
+      io.to(`website:${websiteId}`).emit('ip_event', {
+        ip,
+        location,
+        eventType,
+        session_id,
+      });
+      io.to('admin').emit('ip_event', {
+        ip,
+        location,
+        eventType,
+        websiteId,
+        session_id,
+      });
     }
+    
+    return { success: !error, location };
   } catch (err) {
-    console.error('logLoginEvent failed', err);
+    console.error('[IP LOGGER] Failed to log event:', { ip, eventType, error: err.message });
+    return { success: false, error: err.message, location: null };
   }
 }
 
-module.exports = { logLoginEvent, fetchIpInfo, compressJsonLine };
+module.exports = { logIpEvent, fetchIpInfo, compressJsonLine };

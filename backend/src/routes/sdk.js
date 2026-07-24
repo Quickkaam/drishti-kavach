@@ -9,6 +9,7 @@ const { requireApiKey } = require('../middleware/auth');
 const { validate, sdkEventSchema } = require('../middleware/validate');
 const ddosService = require('../services/ddos');
 const securityService = require('../services/security');
+const { logIpEvent } = require('../utils/loginLogger');
 
 const router = express.Router();
 
@@ -51,6 +52,19 @@ router.post('/log', requireApiKey, validate(sdkEventSchema), async (req, res) =>
       });
     }
 
+    // Log IP event with location data for analytics and DDoS tracking
+    if (userIp && userIp !== '::1' && userIp !== '127.0.0.1') {
+      logIpEvent({
+        websiteId: req.website.id,
+        eventType: event_type,
+        ip: userIp,
+        userAgent,
+        session_id: session_id || undefined,
+        page_url,
+        io: req.io,
+      }).catch(() => {});
+    }
+
     res.json({ ok: true });
   } catch (err) {
     console.error('[SDK LOG]', err.message);
@@ -89,6 +103,19 @@ router.post('/security', requireApiKey, async (req, res) => {
       .insert(secEvent)
       .select('id')
       .single();
+
+    // Log IP event with location data for DDoS tracking
+    if (userIp && userIp !== '::1' && userIp !== '127.0.0.1') {
+      logIpEvent({
+        websiteId: req.website.id,
+        eventType: `security_${type}`,
+        ip: userIp,
+        userAgent,
+        session_id: undefined,
+        page_url: url,
+        io: req.io,
+      }).catch(() => {});
+    }
 
     // Real-time alert to dashboard
     if (req.io) {
@@ -134,6 +161,19 @@ router.post('/form', requireApiKey, async (req, res) => {
       message,
       data: formData || {},
     });
+
+    // Log IP event with location data for analytics and security
+    if (userIp && userIp !== '::1' && userIp !== '127.0.0.1') {
+      logIpEvent({
+        websiteId: req.website.id,
+        eventType: 'form_submission',
+        ip: userIp,
+        userAgent: req.headers['user-agent'],
+        session_id: undefined,
+        page_url: null,
+        io: req.io,
+      }).catch(() => {});
+    }
 
     if (req.io) {
       req.io.to('admin').emit('new_form', {
@@ -358,6 +398,19 @@ router.post('/engagement', requireApiKey, async (req, res) => {
         website_id: websiteId,
         data,
       });
+    }
+
+    // Log IP event with location data for analytics and DDoS tracking
+    if (userIp && userIp !== '::1' && userIp !== '127.0.0.1') {
+      logIpEvent({
+        websiteId: websiteId,
+        eventType: event_type,
+        ip: userIp,
+        userAgent,
+        session_id,
+        page_url: data.url || null,
+        io: req.io,
+      }).catch(() => {});
     }
 
     res.status(200).json({ ok: true });
