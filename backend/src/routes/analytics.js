@@ -48,20 +48,36 @@ router.get('/website/:id/overview', requireAuth, async (req, res) => {
       { data: activeSessions },
       { data: totalSessions },
       { data: sessionsWithDuration },
+      { data: pageViewDurations },
     ] = await Promise.all([
       supabase.from('user_sessions').select('id').eq('website_id', websiteId).eq('is_active', true).gte('started_at', fiveMinAgo),
       supabase.from('user_sessions').select('id').eq('website_id', websiteId).gte('started_at', oneDayAgo),
-      supabase.from('user_sessions').select('id, pages_visited, total_duration').eq('website_id', websiteId).gte('started_at', oneDayAgo),
+      supabase.from('user_sessions').select('id, session_id, pages_visited, total_duration').eq('website_id', websiteId).gte('started_at', oneDayAgo),
+      supabase.from('page_views').select('session_id, duration').eq('website_id', websiteId).gte('created_at', oneDayAgo),
     ]);
 
     let avgDuration = 0;
     let bounceRate  = 0;
 
     if (sessionsWithDuration && sessionsWithDuration.length > 0) {
-      const withDuration = sessionsWithDuration.filter(s => s && s.total_duration > 0);
-      if (withDuration.length > 0) {
-        avgDuration = Math.round(withDuration.reduce((s, x) => s + (x.total_duration || 0), 0) / withDuration.length);
+      // Build a map of page-view duration sums per session (fallback)
+      const pvDurationMap = {};
+      (pageViewDurations || []).forEach(pv => {
+        if (!pvDurationMap[pv.session_id]) pvDurationMap[pv.session_id] = 0;
+        pvDurationMap[pv.session_id] += (pv.duration || 0);
+      });
+
+      // Use total_duration if available, else sum from page views
+      const durationsPerSession = sessionsWithDuration.map(s => {
+        if (s.total_duration && s.total_duration > 0) return s.total_duration;
+        return pvDurationMap[s.session_id] || 0;
+      });
+
+      const nonZero = durationsPerSession.filter(d => d > 0);
+      if (nonZero.length > 0) {
+        avgDuration = Math.round(nonZero.reduce((a, b) => a + b, 0) / nonZero.length);
       }
+
       const bounced = sessionsWithDuration.filter(s => (s && (s.pages_visited || 0) <= 1)).length;
       bounceRate = Math.round((bounced / sessionsWithDuration.length) * 100);
     }
@@ -77,6 +93,9 @@ router.get('/website/:id/overview', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch analytics overview' });
   }
 });
+
+
+
 
 // ─── GET /api/analytics/website/:id/live ──────────────────────
 router.get('/website/:id/live', requireAuth, async (req, res) => {
