@@ -270,41 +270,67 @@ router.post('/engagement', requireApiKey, async (req, res) => {
       }
 
       case 'page_view': {
-        // Ensure session exists
-        const { data: sess } = await supabase
-          .from('user_sessions')
-          .select('id')
-          .eq('session_id', session_id)
-          .eq('website_id', websiteId)
-          .single();
+        try {
+          // Ensure session exists
+          const { data: sess } = await supabase
+            .from('user_sessions')
+            .select('id')
+            .eq('session_id', session_id)
+            .eq('website_id', websiteId)
+            .single();
 
-        if (!sess) {
-          await supabase.from('user_sessions').insert({
-            website_id:   websiteId,
-            session_id,
-            user_ip:      userIp,
-            user_agent:   userAgent,
-            referrer:     data.referrer || null,
-            landing_page: data.url || null,
-            is_active:    true,
-            started_at:   now,
-          });
+          if (!sess) {
+            const { data: newSession, error: sessError } = await supabase
+              .from('user_sessions')
+              .insert({
+                website_id:   websiteId,
+                session_id,
+                user_ip:      userIp,
+                user_agent:   userAgent,
+                referrer:     data.referrer || null,
+                landing_page: data.url || null,
+                is_active:    true,
+                started_at:   now,
+              })
+              .select('id')
+              .single();
+
+            if (sessError) {
+              console.error('[SDK PAGE_VIEW] Session creation error:', sessError.message);
+            } else {
+              console.log('[SDK PAGE_VIEW] Session created:', newSession?.id);
+            }
+          }
+
+          // Insert page view
+          const { error: pvError } = await supabase
+            .from('page_views')
+            .insert({
+              website_id:  websiteId,
+              session_id,
+              page_url:    data.url || null,
+              page_title:  data.title || null,
+              referrer:    data.referrer || null,
+              user_ip:     userIp,
+              user_agent:  userAgent,
+              created_at:  now,
+            });
+
+          if (pvError) {
+            console.error('[SDK PAGE_VIEW] Page view insert error:', pvError.message);
+          } else {
+            console.log('[SDK PAGE_VIEW] Page view recorded for session:', session_id);
+          }
+
+          // Increment pages_visited count on session
+          try {
+            await supabase.rpc('increment_session_page_count', { p_session_id: session_id });
+          } catch (rpcError) {
+            console.error('[SDK PAGE_VIEW] RPC error:', rpcError.message);
+          }
+        } catch (err) {
+          console.error('[SDK PAGE_VIEW] Unexpected error:', err.message);
         }
-
-        // Insert page view
-        await supabase.from('page_views').insert({
-          website_id:  websiteId,
-          session_id,
-          page_url:    data.url || null,
-          page_title:  data.title || null,
-          referrer:    data.referrer || null,
-          user_ip:     userIp,
-          user_agent:  userAgent,
-          created_at:  now,
-        });
-
-        // Increment pages_visited count on session
-        await supabase.rpc('increment_session_page_count', { p_session_id: session_id });
         break;
       }
 
