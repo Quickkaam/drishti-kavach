@@ -8,6 +8,7 @@ const supabase = require('../db/supabase');
 const { getIpIntel } = require('./ipIntel');
 const { autoBlockIp } = require('./ddos');
 const alertService = require('./alerts');
+const { searchWeb, shouldSearchWeb } = require('./webSearch');
 
 // AI Provider Configuration
 const AI_PROVIDER = (process.env.AI_PROVIDER || 'groq').toLowerCase();
@@ -193,7 +194,21 @@ Recent Threats (Last 5): ${JSON.stringify(recentThreats || [])}
 Recent Map Pins: ${JSON.stringify(recentPins || [])}
     `;
 
-    const contextPrompt = `${systemArchitecture}\n\n${dbContext}\n\nUser question: ${question}`;
+    // Web Search — auto-triggered when question needs live internet data
+    let webSearchContext = '';
+    if (shouldSearchWeb(question)) {
+      console.log('[AI CHAT] Web search triggered for:', question.substring(0, 60));
+      const webResults = await searchWeb(question, 5);
+      if (webResults.length > 0) {
+        webSearchContext = `
+[LIVE INTERNET SEARCH RESULTS for: "${question}"]
+${webResults.map((r, i) => `${i + 1}. ${r.title ? r.title + ' — ' : ''}${r.snippet}`).join('\n')}
+(Source: DuckDuckGo live search, ${new Date().toISOString()})`;
+        console.log('[AI CHAT] Got', webResults.length, 'web results');
+      }
+    }
+
+    const contextPrompt = `${systemArchitecture}\n\n${dbContext}${webSearchContext ? '\n\n' + webSearchContext : ''}\n\nUser question: ${question}`;
 
     console.log('[AI CHAT] Calling provider...');
     const res = await axios.post(
@@ -204,7 +219,7 @@ Recent Map Pins: ${JSON.stringify(recentPins || [])}
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: contextPrompt },
         ],
-        max_tokens: 500,
+        max_tokens: 1000,
         temperature: 0.3,
       },
       {
@@ -212,7 +227,7 @@ Recent Map Pins: ${JSON.stringify(recentPins || [])}
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        timeout: 15000,
+        timeout: 20000,
       }
     );
 
