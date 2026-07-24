@@ -1,15 +1,108 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, User, Send, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
+import { Bot, User, Send, ChevronDown, ChevronUp, ShieldAlert, Loader2 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+import api from '../../api/client';
+
+// Helper function to format AI response
+const formatResponse = (content) => {
+  if (content.trim().startsWith('```') || content.includes('```')) {
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1].trim());
+        return { type: 'json', data: parsed };
+      } catch {
+        return { type: 'text', data: content };
+      }
+    }
+  }
+  
+  try {
+    const parsed = JSON.parse(content);
+    return { type: 'json', data: parsed };
+  } catch {
+    return { type: 'text', data: content };
+  }
+};
+
+// Component to render formatted AI response - Clean, no JSON structure
+const ResponseContent = ({ content }) => {
+  const formatted = formatResponse(content);
+  
+  if (formatted.type === 'json') {
+    const data = formatted.data;
+    
+    return (
+      <div className="space-y-3">
+        {data.message && <p className="text-[#e8f4fd] text-xs leading-relaxed">{data.message}</p>}
+        {data.response && !data.message && <p className="text-[#e8f4fd] text-xs leading-relaxed">{data.response}</p>}
+        
+        {(data.threat_assessment || data.threat_level) && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded p-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-red-400 text-xs">⚠️</span>
+              <span className="text-red-400 font-semibold text-[10px] uppercase tracking-wider">Threat Assessment</span>
+            </div>
+            <p className="text-slate-200 text-xs">
+              {typeof data.threat_assessment === 'object' 
+                ? data.threat_assessment.summary || JSON.stringify(data.threat_assessment)
+                : data.threat_assessment || data.threat_level}
+            </p>
+          </div>
+        )}
+        
+        {(data.severity_rating !== undefined && data.severity_rating !== null) && (
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-[10px] font-medium">Risk:</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+              data.severity_rating === 'Low' || data.severity_rating === 0 ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+              data.severity_rating === 'Medium' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+              data.severity_rating === 'High' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+              'bg-red-500/20 text-red-400 border border-red-500/30'
+            }`}>
+              {data.severity_rating}
+            </span>
+          </div>
+        )}
+        
+        {(data.recommendation || data.recommended_action) && (
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-blue-400 text-xs">💡</span>
+              <span className="text-blue-400 font-semibold text-[10px] uppercase tracking-wider">Action</span>
+            </div>
+            <p className="text-slate-200 text-xs">{data.recommendation || data.recommended_action}</p>
+          </div>
+        )}
+        
+        {data.assessment && (
+          <div className="bg-black/20 border border-slate-600/30 rounded p-2">
+            <span className="text-slate-400 font-semibold text-[10px] uppercase tracking-wider">Assessment</span>
+            <p className="text-slate-200 text-xs mt-1">{data.assessment}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  return (
+    <div className="whitespace-pre-wrap break-words text-xs leading-relaxed text-[#e8f4fd]">
+      {content}
+    </div>
+  );
+};
 
 export default function DrishtiAIConsole() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sessionId] = useState(uuidv4());
+  
   const [messages, setMessages] = useState([
     { 
       id: 1, 
       sender: 'ai', 
       text: 'Drishti AI initialized. I am monitoring global traffic anomalies. How can I assist you today?',
-      actions: []
     }
   ]);
   const messagesEndRef = useRef(null);
@@ -22,36 +115,42 @@ export default function DrishtiAIConsole() {
     if (!isCollapsed) {
       scrollToBottom();
     }
-  }, [messages, isCollapsed]);
+  }, [messages, isCollapsed, loading]);
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    // Add user message
-    const newMsg = { id: Date.now(), sender: 'user', text: input, actions: [] };
+    const question = input.trim();
+    const newMsg = { id: Date.now(), sender: 'user', text: question };
     setMessages(prev => [...prev, newMsg]);
     setInput('');
+    setLoading(true);
 
-    // Mock AI response with typing animation effect (timeout)
-    setTimeout(() => {
+    try {
+      const { data } = await api.post('/ai/chat', { 
+        question, 
+        website_id: 1,
+        session_id: sessionId,
+        provider: 'groq',
+      });
+      
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         sender: 'ai',
-        text: 'Analyzing the request... The origin seems to be part of a known botnet. I recommend an immediate block.',
-        actions: ['Execute Block']
+        text: data.response || 'I encountered an issue. Please try again.',
       }]);
-    }, 1000);
-  };
-
-  const handleAction = (action, msgId) => {
-    // Mock action handling
-    setMessages(prev => [...prev, {
-      id: Date.now(),
-      sender: 'ai',
-      text: `Action executed: [${action}]. Security policy updated.`,
-      actions: []
-    }]);
+    } catch (error) {
+      const errorMessage = error.response?.data?.error || error.message || 'Unknown error';
+      console.error('[AI Error]', errorMessage);
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        sender: 'ai',
+        text: `⚠️ Error: ${errorMessage}`,
+      }]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -72,13 +171,13 @@ export default function DrishtiAIConsole() {
       {/* Chat Area */}
       {!isCollapsed && (
         <>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
             {messages.map(msg => (
               <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`flex items-end gap-2 max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <div className={`flex items-start gap-2 max-w-[90%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                   
                   {/* Avatar */}
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${msg.sender === 'user' ? 'bg-[#00d4ff]/20 text-[#00d4ff]' : 'bg-[#f5b041]/20 text-[#f5b041]'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${msg.sender === 'user' ? 'bg-[#00d4ff]/20 text-[#00d4ff]' : 'bg-[#f5b041]/20 text-[#f5b041]'}`}>
                     {msg.sender === 'user' ? <User size={12} /> : <Bot size={12} />}
                   </div>
 
@@ -86,29 +185,32 @@ export default function DrishtiAIConsole() {
                   <div className={`p-3 rounded-lg text-sm font-inter shadow-lg ${
                     msg.sender === 'user' 
                       ? 'bg-[#00d4ff]/10 border border-[#00d4ff]/20 text-[#e8f4fd] rounded-br-none' 
-                      : 'bg-black/40 border border-[#f5b041]/20 text-[#e8f4fd] rounded-bl-none'
+                      : 'bg-black/40 border border-[#f5b041]/20 text-[#e8f4fd] rounded-bl-none w-full'
                   }`}>
-                    {msg.text}
-                    
-                    {/* Suggested Actions */}
-                    {msg.actions && msg.actions.length > 0 && (
-                      <div className="mt-3 flex gap-2 flex-wrap">
-                        {msg.actions.map(action => (
-                          <button 
-                            key={action}
-                            onClick={() => handleAction(action, msg.id)}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-orbitron rounded bg-[#ff3d3d]/10 border border-[#ff3d3d]/40 text-[#ff3d3d] hover:bg-[#ff3d3d]/20 hover:shadow-[0_0_10px_rgba(255,61,61,0.3)] transition-all"
-                          >
-                            <ShieldAlert size={12} />
-                            {action}
-                          </button>
-                        ))}
-                      </div>
+                    {msg.sender === 'user' ? (
+                      <span className="text-xs">{msg.text}</span>
+                    ) : (
+                      <ResponseContent content={msg.text} />
                     )}
                   </div>
                 </div>
               </div>
             ))}
+            
+            {loading && (
+              <div className="flex flex-col items-start">
+                <div className="flex items-start gap-2 max-w-[90%] flex-row">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 bg-[#f5b041]/20 text-[#f5b041]">
+                    <Bot size={12} />
+                  </div>
+                  <div className="p-3 rounded-lg bg-black/40 border border-[#f5b041]/20 rounded-bl-none flex items-center gap-2">
+                    <Loader2 size={14} className="text-[#f5b041] animate-spin" />
+                    <span className="text-xs text-[#f5b041] font-orbitron tracking-widest">ANALYZING...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div ref={messagesEndRef} />
           </div>
 
@@ -120,11 +222,13 @@ export default function DrishtiAIConsole() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask Drishti AI..." 
-                className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-sm font-inter text-text-primary focus:outline-none focus:border-[#f5b041]/50 focus:shadow-[0_0_10px_rgba(245,176,65,0.2)] transition-all"
+                disabled={loading}
+                className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-sm font-inter text-text-primary focus:outline-none focus:border-[#f5b041]/50 focus:shadow-[0_0_10px_rgba(245,176,65,0.2)] transition-all disabled:opacity-50"
               />
               <button 
                 type="submit"
-                className="bg-[#f5b041]/10 border border-[#f5b041]/30 text-[#f5b041] p-2 rounded hover:bg-[#f5b041]/20 transition-colors"
+                disabled={loading}
+                className="bg-[#f5b041]/10 border border-[#f5b041]/30 text-[#f5b041] p-2 rounded hover:bg-[#f5b041]/20 transition-colors disabled:opacity-50"
               >
                 <Send size={18} />
               </button>
