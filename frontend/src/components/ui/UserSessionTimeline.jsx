@@ -25,9 +25,10 @@ function formatDuration(seconds) {
 
 // Sum page-level durations as fallback when session.total_duration is 0
 function getSessionDuration(session) {
-  if (session.total_duration && session.total_duration > 0) return session.total_duration;
+  const total = Number(session.total_duration);
+  if (total && total > 0) return total;
   if (session.pages && session.pages.length > 0) {
-    return session.pages.reduce((sum, p) => sum + (p.duration || 0), 0);
+    return session.pages.reduce((sum, p) => sum + (Number(p.duration) || 0), 0);
   }
   return 0;
 }
@@ -35,7 +36,9 @@ function getSessionDuration(session) {
 // Format a UTC ISO timestamp → visitor's local time
 function formatLocalTime(isoString) {
   if (!isoString) return '—';
-  return new Date(isoString).toLocaleTimeString(undefined, {
+  // If Supabase returns timestamp without timezone, append 'Z' to treat as UTC
+  const utcString = (isoString.endsWith('Z') || isoString.includes('+')) ? isoString : `${isoString}Z`;
+  return new Date(utcString).toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -43,8 +46,34 @@ function formatLocalTime(isoString) {
   });
 }
 
+// Get a flag emoji from country code
+function countryFlag(code) {
+  if (!code || code.length !== 2) return '🌐';
+  return code.toUpperCase().replace(/./g, c =>
+    String.fromCodePoint(c.charCodeAt(0) + 127397)
+  );
+}
 
-export default function UserSessionTimeline({ sessions = [] }) {
+// Detect device from user agent
+function detectDevice(ua) {
+  if (!ua) return '🖥️ Unknown';
+  if (/Mobi|Android|iPhone|iPod/i.test(ua)) return '📱 Mobile';
+  if (/Tablet|iPad/i.test(ua)) return '📟 Tablet';
+  return '🖥️ Desktop';
+}
+
+// Detect browser from user agent
+function detectBrowser(ua) {
+  if (!ua) return 'Unknown';
+  if (/Edg\//i.test(ua)) return 'Edge';
+  if (/OPR\//i.test(ua)) return 'Opera';
+  if (/Firefox\//i.test(ua)) return 'Firefox';
+  if (/Safari\//i.test(ua) && !/Chrome\//i.test(ua)) return 'Safari';
+  if (/Chrome\//i.test(ua)) return 'Chrome';
+  return 'Other';
+}
+
+
   const [expanded, setExpanded] = useState(null);
 
   if (sessions.length === 0) {
@@ -78,7 +107,7 @@ export default function UserSessionTimeline({ sessions = [] }) {
                 onMouseLeave={e => !isExpanded && (e.currentTarget.style.background = 'transparent')}
               >
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.7rem', color: ACCENT, fontFamily: "'JetBrains Mono', monospace" }}>
                       {(session.session_id || '').slice(0, 14) || 'Unknown'}
                     </span>
@@ -90,13 +119,26 @@ export default function UserSessionTimeline({ sessions = [] }) {
                     }}>
                       {session.is_active ? '● ACTIVE' : '○ ENDED'}
                     </span>
+                    {/* IP Address */}
+                    {session.user_ip && session.user_ip !== '::1' && session.user_ip !== '127.0.0.1' && (
+                      <span style={{ fontSize: '0.55rem', color: '#f5b041', fontFamily: "'JetBrains Mono', monospace", background: 'rgba(245,176,65,0.08)', padding: '0.1rem 0.35rem', borderRadius: '0.4rem', border: '1px solid rgba(245,176,65,0.2)' }}>
+                        🔌 {session.user_ip}
+                      </span>
+                    )}
+                    {/* Location */}
+                    {(session.city || session.country) && (
+                      <span style={{ fontSize: '0.55rem', color: '#a29bfe', fontFamily: "'JetBrains Mono', monospace", background: 'rgba(162,155,254,0.08)', padding: '0.1rem 0.35rem', borderRadius: '0.4rem', border: '1px solid rgba(162,155,254,0.2)' }}>
+                        {countryFlag(session.country_code)} {session.city}{session.country ? `, ${session.country}` : ''}
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: '0.65rem', color: '#7a8290', marginTop: '0.2rem', fontFamily: "'JetBrains Mono', monospace" }}>
                     {session.pages_visited || 0} pages · {formatDuration(getSessionDuration(session))} · {formatLocalTime(session.started_at)}
-
+                    {session.isp && <span style={{ color: '#636e72', marginLeft: '0.4rem' }}>· {session.isp}</span>}
                   </div>
                 </div>
                 <span style={{ color: '#7a8290', fontSize: '0.75rem', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'none' }}>▶</span>
+
               </div>
 
               {/* Session page timeline — expanded */}
