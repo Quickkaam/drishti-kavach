@@ -9,6 +9,7 @@ const { getIpIntel } = require('./ipIntel');
 const { autoBlockIp } = require('./ddos');
 const alertService = require('./alerts');
 const { searchWeb, shouldSearchWeb } = require('./webSearch');
+const { extractMemory, saveMemory, getUserMemories, clearMemories } = require('./aiMemory');
 
 // AI Provider Configuration
 const AI_PROVIDER = (process.env.AI_PROVIDER || 'groq').toLowerCase();
@@ -140,6 +141,22 @@ async function chat(userId, websiteId, question, sessionId, provider = null) {
   console.log('[AI CHAT] Starting chat for user:', userId, 'website:', websiteId);
 
   try {
+    // ── MEMORY: Clear command ──────────────────────────────────────────────
+    if (/^(clear my memories?|forget everything|reset memory)/i.test(question.trim())) {
+      await clearMemories(userId);
+      return { response: "🧹 Done! I've cleared all your saved memories. Starting fresh.", memory_cleared: true };
+    }
+
+    // ── MEMORY: Save command ───────────────────────────────────────────────
+    const memoryToSave = extractMemory(question);
+    if (memoryToSave) {
+      await saveMemory(userId, memoryToSave);
+      return {
+        response: `🧠 **Noted and saved permanently:** "${memoryToSave}"\n\nI will remember this across all future conversations.`,
+        memory_saved: true,
+      };
+    }
+
     const config = getProviderConfig(provider);
     const apiKey = config.apiKey;
     const endpointUrl = config.url;
@@ -208,7 +225,10 @@ ${webResults.map((r, i) => `${i + 1}. ${r.title ? r.title + ' — ' : ''}${r.sni
       }
     }
 
-    const contextPrompt = `${systemArchitecture}\n\n${dbContext}${webSearchContext ? '\n\n' + webSearchContext : ''}\n\nUser question: ${question}`;
+    // ── MEMORY: Load user's saved memories ────────────────────────────────
+    const memoryContext = await getUserMemories(userId);
+
+    const contextPrompt = `${systemArchitecture}\n\n${dbContext}${webSearchContext ? '\n\n' + webSearchContext : ''}${memoryContext ? '\n\n' + memoryContext : ''}\n\nUser question: ${question}`;
 
     console.log('[AI CHAT] Calling provider...');
     const res = await axios.post(
