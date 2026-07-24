@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, LayersControl, Marker, Popup, LayerGroup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, LayersControl, Marker, Popup, LayerGroup, Polyline, CircleMarker, Tooltip } from 'react-leaflet';
 import { useSocket } from '../../context/SocketContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -198,21 +198,37 @@ export default function RouteMap({ arcsData, mapStyle }) {
           </Marker>
         )}
 
-        {/* Attack arcs */}
+        {/* Attack / Visitor paths and points */}
         <LayerGroup>
           {arcsData.slice(-20).map((arc, i) => (
-            <Polyline
-              key={i}
-              positions={[
-                [arc.startLat, arc.startLng],
-                [SERVER.lat, SERVER.lng],
-              ]}
-              color={arc.color}
-              weight={2}
-              opacity={0.7}
-              dashArray="5, 10"
-              dashOffset="0"
-            />
+            <React.Fragment key={i}>
+              <Polyline
+                positions={[
+                  [arc.startLat, arc.startLng],
+                  [SERVER.lat, SERVER.lng],
+                ]}
+                color={arc.color}
+                weight={2}
+                opacity={0.7}
+                dashArray="5, 10"
+                dashOffset="0"
+              />
+              <CircleMarker
+                center={[arc.startLat, arc.startLng]}
+                radius={4}
+                fillColor={arc.color}
+                color={arc.color}
+                weight={1}
+                opacity={1}
+                fillOpacity={0.8}
+              >
+                <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                  <div className="font-mono text-xs font-bold text-slate-800">
+                    {arc.label || 'Unknown IP'}
+                  </div>
+                </Tooltip>
+              </CircleMarker>
+            </React.Fragment>
           ))}
         </LayerGroup>
       </MapContainer>
