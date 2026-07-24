@@ -19,10 +19,29 @@ if (!fs.existsSync(logsDir)) {
 
 const logFilePath = path.join(logsDir, 'ip_events.jsonl.gz');
 
+/** Get the real visitor IP address (handles proxy headers) */
+function getRealIpAddress(req) {
+  // Check Cloudflare header first
+  const cfConnectingIp = req.headers['cf-connecting-ip'];
+  if (cfConnectingIp) return cfConnectingIp.split(',')[0].trim();
+  
+  // Check X-Forwarded-For header
+  const xForwardedFor = req.headers['x-forwarded-for'];
+  if (xForwardedFor) return xForwardedFor.split(',')[0].trim();
+  
+  // Fall back to req.ip (which respects trust proxy setting)
+  return req.ip;
+}
+
 /** Fetch enriched IP info from ipinfo.io or ip-api.com */
 async function fetchIpInfo(ip) {
   if (!ip || ip === '::1' || ip === '127.0.0.1' || ip === 'localhost') {
     return { country: 'Localhost', country_code: 'LO', city: 'Localhost', lat: 0, lon: 0 };
+  }
+  
+  // Skip private/internal IPs that can't be geolocated
+  if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('172.') || ip.startsWith('127.')) {
+    return { country: 'Private Network', country_code: 'PR', city: 'Internal', lat: 0, lon: 0 };
   }
   
   try {
@@ -90,13 +109,16 @@ async function logIpEvent({
   websiteId, 
   eventType, 
   ip, 
+  req = null,
   userAgent = null, 
   session_id = null,
   page_url = null,
   io = null
 }) {
   try {
-    const location = await fetchIpInfo(ip);
+    // Extract IP from req if not provided
+    const ipAddress = req ? getRealIpAddress(req) : ip;
+    const location = await fetchIpInfo(ipAddress);
     const event = {
       website_id: websiteId,
       event_type: eventType,
@@ -117,7 +139,7 @@ async function logIpEvent({
     const insertData = {
       website_id: websiteId,
       event_type: eventType,
-      user_ip: ip,
+      user_ip: ipAddress,
       user_agent: userAgent,
       referrer: null,
       location: JSON.stringify(location),
@@ -165,4 +187,4 @@ async function logIpEvent({
   }
 }
 
-module.exports = { logIpEvent, fetchIpInfo, compressJsonLine };
+module.exports = { logIpEvent, fetchIpInfo, compressJsonLine, getRealIpAddress };

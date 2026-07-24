@@ -12,7 +12,7 @@ const { requireAuth } = require('../middleware/auth');
 const { verifyTurnstile } = require('../middleware/turnstile');
 const { logAuthEvent, logError: logErrorLog } = require('../services/logging');
 const { notifyLogin, createDefaultPreferences, getNotificationPreferences } = require('../services/notifications');
-const { fetchIpInfo } = require('../utils/loginLogger');
+const { fetchIpInfo, getRealIpAddress } = require('../utils/loginLogger');
 
 const router = express.Router();
 
@@ -100,7 +100,6 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
 
     // Check for location change (async)
     if (user.last_ip && user.last_ip !== req.ip && (user.role === 'admin' || user.role === 'superadmin')) {
-      const { fetchIpInfo } = require('../utils/loginLogger');
       const alertService = require('../services/alerts');
       Promise.all([fetchIpInfo(user.last_ip), fetchIpInfo(req.ip)])
         .then(([oldLoc, newLoc]) => {
@@ -131,7 +130,7 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
     // Log the login event (email, IP, enriched location)
     const { logLoginEvent } = require('../utils/loginLogger');
     // req.io is attached in server.js middleware
-    logLoginEvent({ userId: user.id, email, ip: req.ip, io: req.io }).catch(console.error);
+    logLoginEvent({ userId: user.id, email, req, io: req.io }).catch(console.error);
 
     // Log successful login to database
     await logAuthEvent({
@@ -143,8 +142,9 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
     }).catch(err => console.error('[LOG LOGIN EVENT]', err));
 
     // Send login notification
-    const location = await fetchIpInfo(req.ip);
-    notifyLogin(user, req.ip, location).catch(err => console.error('[LOGIN NOTIFICATION]', err));
+    const realIp = getRealIpAddress(req);
+    const location = await fetchIpInfo(realIp);
+    notifyLogin(user, realIp, location).catch(err => console.error('[LOGIN NOTIFICATION]', err));
 
     // Ensure user has notification preferences
     const existingPrefs = await getNotificationPreferences(user.id);
