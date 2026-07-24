@@ -187,7 +187,7 @@ router.post('/engagement', requireApiKey, async (req, res) => {
           .single();
 
         if (!existing) {
-          await supabase.from('user_sessions').insert({
+          const sessionData = {
             website_id:   websiteId,
             session_id,
             user_ip:      userIp,
@@ -196,7 +196,31 @@ router.post('/engagement', requireApiKey, async (req, res) => {
             landing_page: data.url || null,
             is_active:    true,
             started_at:   now,
-          });
+          };
+          
+          const { data: session } = await supabase
+            .from('user_sessions')
+            .insert(sessionData)
+            .select('id')
+            .single();
+
+          // Auto-create page_view for session start (only if URL provided)
+          if (data.url) {
+            await supabase.from('page_views').insert({
+              website_id:  websiteId,
+              session_id,
+              page_url:    data.url,
+              page_title:  data.title || null,
+              referrer:    data.referrer || null,
+              user_ip:     userIp,
+              user_agent:  userAgent,
+              created_at:  now,
+              duration:    0, // Will be updated by time_on_page events
+            });
+
+            // Also call the RPC function to increment page count
+            await supabase.rpc('increment_session_page_count', { p_session_id: session_id });
+          }
         }
         break;
       }
