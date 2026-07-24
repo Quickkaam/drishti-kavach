@@ -73,7 +73,7 @@ function detectBrowser(ua) {
   return 'Other';
 }
 
-
+export default function UserSessionTimeline({ sessions = [] }) {
   const [expanded, setExpanded] = useState(null);
 
   if (sessions.length === 0) {
