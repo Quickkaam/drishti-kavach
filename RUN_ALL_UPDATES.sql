@@ -123,8 +123,13 @@ CREATE INDEX IF NOT EXISTS idx_notifications_reference ON notifications(referenc
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "service_role_notifications" ON notifications FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY "service_role_preferences" ON notification_preferences FOR ALL TO service_role USING (true) WITH CHECK (true);
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "service_role_notifications" ON notifications;
+  DROP POLICY IF EXISTS "service_role_preferences" ON notification_preferences;
+  CREATE POLICY "service_role_notifications" ON notifications FOR ALL TO service_role USING (true) WITH CHECK (true);
+  CREATE POLICY "service_role_preferences" ON notification_preferences FOR ALL TO service_role USING (true) WITH CHECK (true);
+END $$;
 
 GRANT ALL PRIVILEGES ON notifications TO service_role, authenticated, anon;
 GRANT ALL PRIVILEGES ON notification_preferences TO service_role, authenticated, anon;
@@ -214,10 +219,18 @@ ALTER TABLE user_interactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE geographic_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE device_analytics ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "service_role_user_sessions" ON user_sessions FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY "service_role_page_views" ON page_views FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY "service_role_geographic_data" ON geographic_data FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY "service_role_device_analytics" ON device_analytics FOR ALL TO service_role USING (true) WITH CHECK (true);
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "service_role_user_sessions" ON user_sessions;
+  DROP POLICY IF EXISTS "service_role_page_views" ON page_views;
+  DROP POLICY IF EXISTS "service_role_geographic_data" ON geographic_data;
+  DROP POLICY IF EXISTS "service_role_device_analytics" ON device_analytics;
+  
+  CREATE POLICY "service_role_user_sessions" ON user_sessions FOR ALL TO service_role USING (true) WITH CHECK (true);
+  CREATE POLICY "service_role_page_views" ON page_views FOR ALL TO service_role USING (true) WITH CHECK (true);
+  CREATE POLICY "service_role_geographic_data" ON geographic_data FOR ALL TO service_role USING (true) WITH CHECK (true);
+  CREATE POLICY "service_role_device_analytics" ON device_analytics FOR ALL TO service_role USING (true) WITH CHECK (true);
+END $$;
 
 GRANT ALL PRIVILEGES ON user_sessions TO service_role, authenticated;
 GRANT ALL PRIVILEGES ON page_views TO service_role, authenticated;
@@ -259,8 +272,13 @@ CREATE INDEX IF NOT EXISTS idx_mitre_mappings_resolved ON website_mitre_mappings
 ALTER TABLE mitre_techniques ENABLE ROW LEVEL SECURITY;
 ALTER TABLE website_mitre_mappings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "service_role_mitre" ON mitre_techniques FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY "service_role_mitre_mappings" ON website_mitre_mappings FOR ALL TO service_role USING (true) WITH CHECK (true);
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "service_role_mitre" ON mitre_techniques;
+  DROP POLICY IF EXISTS "service_role_mitre_mappings" ON website_mitre_mappings;
+  CREATE POLICY "service_role_mitre" ON mitre_techniques FOR ALL TO service_role USING (true) WITH CHECK (true);
+  CREATE POLICY "service_role_mitre_mappings" ON website_mitre_mappings FOR ALL TO service_role USING (true) WITH CHECK (true);
+END $$;
 
 GRANT ALL PRIVILEGES ON mitre_techniques TO service_role, authenticated;
 GRANT ALL PRIVILEGES ON website_mitre_mappings TO service_role, authenticated;
