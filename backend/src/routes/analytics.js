@@ -58,11 +58,11 @@ router.get('/website/:id/overview', requireAuth, async (req, res) => {
     let bounceRate  = 0;
 
     if (sessionsWithDuration && sessionsWithDuration.length > 0) {
-      const withDuration = sessionsWithDuration.filter(s => s.total_duration > 0);
+      const withDuration = sessionsWithDuration.filter(s => s && s.total_duration > 0);
       if (withDuration.length > 0) {
         avgDuration = Math.round(withDuration.reduce((s, x) => s + (x.total_duration || 0), 0) / withDuration.length);
       }
-      const bounced = sessionsWithDuration.filter(s => (s.pages_visited || 0) <= 1).length;
+      const bounced = sessionsWithDuration.filter(s => (s && (s.pages_visited || 0) <= 1)).length;
       bounceRate = Math.round((bounced / sessionsWithDuration.length) * 100);
     }
 
