@@ -17,15 +17,22 @@ router.post('/simulate-pin', async (req, res) => {
     if (!ip) return res.status(400).json({ error: 'IP is required' });
 
     // 1. Save to permanent map_pins table
-    if (location && location.lat && location.lon) {
-      await supabase.from('map_pins').upsert({
+    if (location && typeof location.lat === 'number' && typeof location.lon === 'number' || (location && location.lat && location.lon)) {
+      const { data, error } = await supabase.from('map_pins').upsert({
         ip,
-        latitude: location.lat,
-        longitude: location.lon,
+        latitude: parseFloat(location.lat) || 0,
+        longitude: parseFloat(location.lon) || 0,
         city: location.city || null,
         country: location.country || null,
         pinned_at: new Date().toISOString()
       }, { onConflict: 'ip' });
+      
+      if (error) {
+        console.error('[SIMULATE PIN] DB Error:', error);
+        throw new Error('Failed to upsert map_pins: ' + error.message);
+      }
+    } else {
+      console.warn('[SIMULATE PIN] Missing lat/lon in request', location);
     }
 
     // 2. Emit live event to trigger the globe/map animation instantly
