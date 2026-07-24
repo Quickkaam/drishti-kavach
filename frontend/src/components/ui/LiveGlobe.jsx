@@ -2,6 +2,26 @@ import React, { useEffect, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
 import { useSocket } from '../../context/SocketContext';
 import RouteMap from './RouteMap';
+import api from '../../api/client';
+
+// Approximate coordinates for country codes (fallback for historical sessions)
+const COUNTRY_COORDS = {
+  'IN': { lat: 20.5937, lng: 78.9629 },
+  'US': { lat: 37.0902, lng: -95.7129 },
+  'GB': { lat: 55.3781, lng: -3.4360 },
+  'CA': { lat: 56.1304, lng: -106.3468 },
+  'AU': { lat: -25.2744, lng: 133.7751 },
+  'DE': { lat: 51.1657, lng: 10.4515 },
+  'FR': { lat: 46.2276, lng: 2.2137 },
+  'CN': { lat: 35.8617, lng: 104.1954 },
+  'RU': { lat: 61.5240, lng: 105.3188 },
+  'BR': { lat: -14.2350, lng: -51.9253 },
+  'JP': { lat: 36.2048, lng: 138.2529 },
+  'KR': { lat: 35.9078, lng: 127.7669 },
+  'SG': { lat: 1.3521, lng: 103.8198 },
+  'AE': { lat: 23.4241, lng: 53.8478 },
+  'ZA': { lat: -30.5595, lng: 22.9375 },
+};
 
 // Map style options
 const VIEW_MODES = {
@@ -47,12 +67,44 @@ export default function LiveGlobe() {
   const [visitorPoints, setVisitorPoints] = useState([]);
   
   const [viewMode, setViewMode] = useState('globe');
-  const [trafficType, setTrafficType] = useState('attack'); // 'attack' or 'visitor'
+  const [trafficType, setTrafficType] = useState('visitor'); // Default to visitor to show populated data
   const [mapStyle, setMapStyle] = useState('dark');
   const { lastIncident, visitorEvent, connectionStatus } = useSocket();
 
   // Server location — Mumbai
   const SERVER = { lat: 19.076, lng: 72.877 };
+
+  // Fetch historical sessions to pre-populate the globe on mount
+  useEffect(() => {
+    api.get('/analytics/website/1/sessions?limit=50')
+      .then(res => {
+        const sessions = res.data;
+        if (!sessions || !Array.isArray(sessions)) return;
+        
+        const initialArcs = [];
+        const initialPoints = [];
+        
+        sessions.forEach(session => {
+          // Use country code mapping for historical data
+          const coords = COUNTRY_COORDS[session.country_code] || { lat: (Math.random() - 0.5) * 140, lng: (Math.random() - 0.5) * 340 };
+          const color = '#00d4ff';
+          
+          initialArcs.push({
+            startLat: coords.lat, startLng: coords.lng,
+            endLat: SERVER.lat, endLng: SERVER.lng,
+            color,
+            label: session.user_ip || 'UNKNOWN',
+          });
+          initialPoints.push({
+            lat: coords.lat, lng: coords.lng, size: 0.3, color, label: session.user_ip || 'UNKNOWN'
+          });
+        });
+        
+        setVisitorArcs(initialArcs.reverse());
+        setVisitorPoints(initialPoints.reverse());
+      })
+      .catch(err => console.error('[LiveGlobe] Failed to fetch initial sessions', err));
+  }, []);
 
   // React to live incidents (Attacks)
   useEffect(() => {
