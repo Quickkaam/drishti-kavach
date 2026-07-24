@@ -60,11 +60,11 @@ export default function Analytics() {
     setLoading(true);
     try {
       const [overviewRes, activityRes, pagesRes, sessionsRes, devicesRes] = await Promise.allSettled([
-        api.get(`/api/analytics/website/${websiteId}/overview`),
-        api.get(`/api/analytics/website/${websiteId}/activity?range=${timeRange}`),
-        api.get(`/api/analytics/website/${websiteId}/pages?limit=10`),
-        api.get(`/api/analytics/website/${websiteId}/sessions?limit=10`),
-        api.get(`/api/analytics/website/${websiteId}/devices`),
+        api.get(`/analytics/website/${websiteId}/overview`),
+        api.get(`/analytics/website/${websiteId}/activity?range=${timeRange}`),
+        api.get(`/analytics/website/${websiteId}/pages?limit=10`),
+        api.get(`/analytics/website/${websiteId}/sessions?limit=10`),
+        api.get(`/analytics/website/${websiteId}/devices`),
       ]);
       if (overviewRes.status === 'fulfilled') setOverview(overviewRes.value.data);
       if (activityRes.status === 'fulfilled') setActivityData(activityRes.value.data);
@@ -80,7 +80,7 @@ export default function Analytics() {
 
   const fetchLive = useCallback(async () => {
     try {
-      const res = await api.get(`/api/analytics/website/${websiteId}/live`);
+      const res = await api.get(`/analytics/website/${websiteId}/live`);
       setLiveVisitors(res.data);
     } catch (_) {}
   }, [websiteId]);
