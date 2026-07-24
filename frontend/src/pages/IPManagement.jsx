@@ -543,25 +543,58 @@ export default function IPManagement() {
                   ))}
                 </div>
 
-                <button
-                  onClick={() => {
-                    setBlockForm({ 
-                      ip: intel.ip, 
-                      reason: `Threat score: ${intel.threat_score}/100`, 
-                      severity: intel.threat_score >= 80 ? 'critical' : 'high' 
-                    });
-                    setTab('block');
-                  }}
-                  style={cyberButtonStyle(false, 'danger')}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = '0 0 12px rgba(255, 61, 61, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  🚫 BLOCK THIS IP
-                </button>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button
+                    onClick={() => {
+                      setBlockForm({ 
+                        ip: intel.ip, 
+                        reason: `Threat score: ${intel.threat_score}/100`, 
+                        severity: intel.threat_score >= 80 ? 'critical' : 'high' 
+                      });
+                      setTab('block');
+                    }}
+                    style={cyberButtonStyle(false, 'danger')}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.boxShadow = '0 0 12px rgba(255, 61, 61, 0.3)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    🚫 BLOCK THIS IP
+                  </button>
+                  
+                  <button
+                    onClick={async (e) => {
+                      const btn = e.currentTarget;
+                      const originalText = btn.innerText;
+                      btn.innerText = '📍 PINNING...';
+                      try {
+                        await api.post('/security/simulate-pin', { ip: intel.ip, location: { lat: intel.latitude, lon: intel.longitude } });
+                        btn.innerText = '✅ PINNED ON MAP';
+                        setTimeout(() => btn.innerText = originalText, 3000);
+                      } catch (err) {
+                        btn.innerText = '❌ FAILED';
+                        setTimeout(() => btn.innerText = originalText, 3000);
+                      }
+                    }}
+                    style={{
+                      ...cyberButtonStyle(false),
+                      borderColor: 'rgba(0, 212, 255, 0.5)',
+                      color: '#00d4ff',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(0, 212, 255, 0.1)';
+                      e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 212, 255, 0.3)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    🌍 ADD TO GLOBE & MAP
+                  </button>
+                </div>
               </div>
             )}
           </div>

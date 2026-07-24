@@ -5,9 +5,30 @@
 const express = require('express');
 const supabase = require('../db/supabase');
 const { requireAuth, requireRole } = require('../middleware/auth');
+const { logIpEvent } = require('../utils/loginLogger');
 
 const router = express.Router();
 router.use(requireAuth);
+
+// POST /api/security/simulate-pin — Send IP to globe
+router.post('/simulate-pin', async (req, res) => {
+  try {
+    const { ip, location } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP is required' });
+
+    // Emit live event to trigger the globe/map animation
+    await logIpEvent({
+      websiteId: '1', // Default or grab from context if multi-tenant
+      ip,
+      eventType: 'intel_lookup',
+      io: req.app.get('io')
+    });
+
+    res.json({ success: true, message: 'Sent to globe' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to pin IP' });
+  }
+});
 
 // GET /api/security/events
 router.get('/events', async (req, res) => {
