@@ -194,7 +194,7 @@ export default function Credentials() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`flex items-center gap-1.5 text-xs ${u.is_active ? 'text-green-400' : 'text-slate-500'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? 'bg-green-400' : 'bg-slate-500'}`}></span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? 'bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.6)]' : 'bg-slate-500'}`}></span>
                           {u.is_active ? 'Active' : 'Disabled'}
                         </span>
                       </td>
@@ -203,17 +203,17 @@ export default function Credentials() {
                           {u.last_login ? new Date(u.last_login).toLocaleString() : new Date(u.created_at).toLocaleString()}
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
-                          {u.last_login ? 'Last Login' : 'Account Created'}
+                          {u.last_login ? `Last Login · ${u.login_count || 0} logins` : 'Account Created'}
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs font-mono text-slate-300 bg-slate-800/50 px-2 py-1 rounded">
-                          {u.last_ip || 'Unknown'}
+                          {u.last_login_ip || 'No login yet'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs text-slate-400">
-                          {u.last_ip ? 'Monitored / Logged' : 'N/A'}
+                          {u.last_login_ip ? '🔒 Monitored / Logged' : '—'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">

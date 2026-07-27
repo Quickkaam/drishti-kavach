@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
   try {
     const { data } = await supabase
       .from('users')
-      .select('id, username, email_encrypted, role, created_at, last_login, is_active, last_ip')
+      .select('id, username, email_encrypted, role, created_at, last_login, is_active, last_login_ip, login_count')
       .order('created_at', { ascending: false });
 
     // Decrypt emails where needed
@@ -134,7 +134,7 @@ router.patch('/:id', async (req, res) => {
       .from('users')
       .update(updates)
       .eq('id', req.params.id)
-      .select('id, username, email, role, is_active')
+      .select('id, username, role, is_active')
       .single();
 
     if (error) throw error;
