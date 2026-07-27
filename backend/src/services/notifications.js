@@ -322,7 +322,7 @@ async function sendNotification({
       // Send to specific user only
       const { data: user } = await supabase
         .from('users')
-        .select('id, role, email')
+        .select('id, role')
         .eq('id', targetUserId)
         .single();
       if (user) targetUsers = [user];
@@ -330,7 +330,7 @@ async function sendNotification({
       // Send to users with specific roles
       const { data: users } = await supabase
         .from('users')
-        .select('id, role, email')
+        .select('id, role')
         .in('role', Array.isArray(targetRoles) ? targetRoles : [targetRoles])
         .eq('is_active', true);
       targetUsers = users || [];
@@ -343,7 +343,7 @@ async function sendNotification({
       
       const { data: users } = await supabase
         .from('users')
-        .select('id, role, email')
+        .select('id, role')
         .in('role', applicableRoles)
         .eq('is_active', true);
       targetUsers = users || [];
