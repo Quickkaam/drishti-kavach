@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Eye, EyeOff } from 'lucide-react';
 
 // Animated neural network SVG background
 const NeuralBg = () => (
@@ -44,6 +45,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle | scanning | authenticated
@@ -209,10 +211,17 @@ export default function LoginPage() {
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                      className="cyber-input" placeholder="operative@drishti.kavach" required/>
             </div>
-            <div>
+            <div className="relative">
               <label className="cyber-label block mb-2">NEURAL KEY</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                     className="cyber-input" placeholder="••••••••••••" required/>
+              <input type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                     className="cyber-input w-full pr-10" placeholder="••••••••••••" required/>
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-[34px] text-cyber-cyan opacity-60 hover:opacity-100 transition-opacity"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
 
             {/* Turnstile Security Verification */}

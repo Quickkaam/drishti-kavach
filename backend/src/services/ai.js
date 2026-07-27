@@ -8,6 +8,7 @@ const supabase = require('../db/supabase');
 const { getIpIntel } = require('./ipIntel');
 const { autoBlockIp } = require('./ddos');
 const alertService = require('./alerts');
+const { sendNotification, TYPES, SEVERITY, CATEGORIES, ROLES } = require('./notifications');
 const { searchWeb, shouldSearchWeb } = require('./webSearch');
 const { extractMemory, saveMemory, getUserMemories, clearMemories } = require('./aiMemory');
 
@@ -118,10 +119,42 @@ Respond with: { "threat_level": "low|medium|high|critical", "recommendation": "b
       await supabase.from('ai_decisions').update({ action_taken: true, action_result: 'IP blocked' })
         .eq('event_id', eventId).eq('ip', ip);
 
-      await alertService.sendAlert({
+      await sendNotification({
         title: `🛡️ Drishti AI Auto-Blocked IP`,
         message: `IP ${ip} blocked. Reason: ${decision.reasoning.substring(0, 150)}`,
-        severity: 'critical',
+        type: TYPES.SECURITY,
+        severity: SEVERITY.CRITICAL,
+        category: CATEGORIES.AI,
+        targetRoles: [ROLES.SUPERADMIN, ROLES.ADMIN],
+        websiteId,
+        referenceType: 'security_event',
+        referenceId: eventId,
+        sendEmail: true,
+        sendSlack: true,
+        sendTelegram: true,
+        sendInApp: true,
+        io
+      });
+    } else {
+      // Send a general notification for AI investigation that didn't result in auto-block
+      const alertSeverity = decision.threat_level === 'critical' ? SEVERITY.CRITICAL : decision.threat_level === 'high' ? SEVERITY.HIGH : SEVERITY.INFO;
+      const alertType = decision.threat_level === 'critical' || decision.threat_level === 'high' ? TYPES.WARNING : TYPES.INFO;
+      
+      await sendNotification({
+        title: `🤖 AI Investigation: ${String(decision.threat_level || 'unknown').toUpperCase()} Threat`,
+        message: `Recommendation: ${decision.recommendation}. Reason: ${(decision.reasoning || '').substring(0, 150)}`,
+        type: alertType,
+        severity: alertSeverity,
+        category: CATEGORIES.AI,
+        targetRoles: [ROLES.SUPERADMIN, ROLES.ADMIN],
+        websiteId,
+        referenceType: 'security_event',
+        referenceId: eventId,
+        sendEmail: alertSeverity === SEVERITY.CRITICAL,
+        sendSlack: true,
+        sendTelegram: alertSeverity === SEVERITY.CRITICAL,
+        sendInApp: true,
+        io
       });
     }
 
@@ -307,10 +340,18 @@ Write a professional 3-4 sentence summary with: overall status, key findings, an
     const summary = await callDeepSeek(prompt);
 
     if (summary) {
-      await alertService.sendAlert({
+      await sendNotification({
         title: '📊 Drishti Kavach — Daily Security Summary',
         message: summary,
-        severity: 'info',
+        type: TYPES.INFO,
+        severity: SEVERITY.INFO,
+        category: CATEGORIES.AI,
+        targetRoles: [ROLES.SUPERADMIN, ROLES.ADMIN],
+        websiteId,
+        sendEmail: true,
+        sendSlack: true,
+        sendTelegram: false,
+        sendInApp: true
       });
     }
 

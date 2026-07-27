@@ -235,14 +235,14 @@ router.get('/website/:id/sessions', requireAuth, async (req, res) => {
 
     // --- Start Backfill Logic ---
     // Find sessions that have an IP but are missing latitude/longitude
+    // Using == null checks for both null and undefined, protecting against missing columns
     const missingGeoSessions = (sessions || []).filter(
-      s => s.user_ip && s.user_ip !== '::1' && s.user_ip !== '127.0.0.1' && (s.latitude === null || s.longitude === null)
+      s => s.user_ip && s.user_ip !== '::1' && s.user_ip !== '127.0.0.1' && (s.latitude == null || s.longitude == null)
     );
 
     if (missingGeoSessions.length > 0) {
       try {
         const uniqueIpsToFetch = [...new Set(missingGeoSessions.map(s => s.user_ip))];
-        // ip-api.com batch endpoint (HTTP is fine here since it's backend-to-backend)
         const batchReq = uniqueIpsToFetch.map(ip => ({ query: ip, fields: "lat,lon,city,country,countryCode,isp,regionName,query" }));
         
         const ipRes = await fetch('http://ip-api.com/batch', {
@@ -250,37 +250,39 @@ router.get('/website/:id/sessions', requireAuth, async (req, res) => {
           body: JSON.stringify(batchReq),
           headers: { 'Content-Type': 'application/json' }
         });
-        const ipData = await ipRes.json();
+        
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          const updates = [];
+          
+          for (const session of missingGeoSessions) {
+            const geo = ipData.find(d => d.query === session.user_ip);
+            if (geo && geo.lat && geo.lon) {
+              session.latitude = parseFloat(geo.lat);
+              session.longitude = parseFloat(geo.lon);
+              session.city = geo.city || session.city;
+              session.country = geo.country || session.country;
+              session.country_code = geo.countryCode || session.country_code;
+              session.isp = geo.isp || session.isp;
+              session.region = geo.regionName || session.region;
 
-        const updates = [];
-        for (const session of missingGeoSessions) {
-          const geo = ipData.find(d => d.query === session.user_ip);
-          if (geo && geo.lat && geo.lon) {
-            // Update the session object in memory so it's returned to the client immediately
-            session.latitude = parseFloat(geo.lat);
-            session.longitude = parseFloat(geo.lon);
-            session.city = geo.city || session.city;
-            session.country = geo.country || session.country;
-            session.country_code = geo.countryCode || session.country_code;
-            session.isp = geo.isp || session.isp;
-            session.region = geo.regionName || session.region;
-
-            // Prepare for DB update
-            updates.push(
-              supabase.from('user_sessions').update({
-                latitude: session.latitude,
-                longitude: session.longitude,
-                city: session.city,
-                country: session.country,
-                country_code: session.country_code,
-                isp: session.isp,
-                region: session.region,
-              }).eq('id', session.id)
-            );
+              // Don't push to DB if columns might not exist to avoid error spam, 
+              // but we'll try catching the error silently
+              updates.push(
+                supabase.from('user_sessions').update({
+                  latitude: session.latitude,
+                  longitude: session.longitude,
+                  city: session.city,
+                  country: session.country,
+                  country_code: session.country_code,
+                  isp: session.isp,
+                  region: session.region,
+                }).eq('id', session.id)
+              );
+            }
           }
+          Promise.allSettled(updates).catch(e => console.error('Failed to backfill session geo', e));
         }
-        // Fire and forget DB updates
-        Promise.allSettled(updates).catch(e => console.error('Failed to backfill session geo', e));
       } catch (err) {
         console.error('[ANALYTICS SESSIONS] Failed to backfill geo locations:', err.message);
       }
@@ -288,16 +290,21 @@ router.get('/website/:id/sessions', requireAuth, async (req, res) => {
     // --- End Backfill Logic ---
 
     // Get pages for each session
-    const enriched = await Promise.all((sessions || []).map(async (s) => {
-      const { data: pages } = await supabase
-        .from('page_views')
-        .select('page_url, created_at, duration, scroll_depth')
-        .eq('session_id', s.session_id)
-        .eq('website_id', websiteId)
-        .order('created_at', { ascending: true });
-      return { ...s, pages: pages || [] };
+    const enrichedResults = await Promise.allSettled((sessions || []).map(async (s) => {
+      try {
+        const { data: pages } = await supabase
+          .from('page_views')
+          .select('page_url, created_at, duration, scroll_depth')
+          .eq('session_id', s.session_id)
+          .eq('website_id', websiteId)
+          .order('created_at', { ascending: true });
+        return { ...s, pages: pages || [] };
+      } catch (pageErr) {
+        return { ...s, pages: [] }; // Fallback
+      }
     }));
 
+    const enriched = enrichedResults.map(res => res.status === 'fulfilled' ? res.value : null).filter(Boolean);
     res.json(enriched);
   } catch (err) {
     console.error('[ANALYTICS SESSIONS]', err.message);
