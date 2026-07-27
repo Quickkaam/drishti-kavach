@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/reports/generate — Generate a text report
-router.post('/generate', requireRole('admin', 'analyst'), async (req, res) => {
+router.post('/generate', requireRole('superadmin', 'admin', 'analyst'), async (req, res) => {
   try {
     const { website_id, period = '7d' } = req.body;
     const days = period === '30d' ? 30 : 7;
@@ -57,7 +57,7 @@ Threat Breakdown: ${JSON.stringify((sec || []).reduce((acc, e) => {
 
 Write a 5-6 sentence professional security report covering: executive summary, key findings, threat analysis, and recommendations. Use formal language suitable for stakeholders.`;
 
-    const report = await callDeepSeek(prompt);
+    const report = await callDeepSeek(prompt) || `Automated System Report\n\nPeriod: Last ${days} days\nTotal Events: ${events || 0}\nSecurity Threats: ${sec?.length || 0}\nBlocked IPs: ${blocked || 0}\n\nNote: Detailed AI analysis is currently unavailable. Please check system logs for more details.`;
 
     // Log the report generation
     await supabase.from('audit_logs').insert({
