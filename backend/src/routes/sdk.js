@@ -464,10 +464,6 @@ router.post('/engagement', requireApiKey, async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[SDK ENGAGEMENT ERROR]', err.message, {
-      event_type,
-      session_id,
-      websiteId,
-      userIp,
       body: req.body,
     });
     res.status(500).json({ error: 'Failed to track engagement' });

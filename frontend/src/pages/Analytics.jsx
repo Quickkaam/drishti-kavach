@@ -44,8 +44,8 @@ function formatDuration(seconds) {
 
 export default function Analytics() {
   const { user } = useAuth();
-  // Always default to website 1 (Quick Kaam)
-  const websiteId = 1;
+  // Default to the user's active website or 1 as fallback
+  const websiteId = user?.website_id || 1;
 
   const [overview,     setOverview]     = useState(null);
   const [liveVisitors, setLiveVisitors] = useState([]);
