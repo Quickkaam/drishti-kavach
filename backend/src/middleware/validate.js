@@ -65,7 +65,7 @@ const createUserSchema = z.object({
 });
 
 const aiChatSchema = z.object({
-  question: z.string().min(1).max(2000),
+  question: z.string().min(1),
   website_id: z.number().or(z.string()),
   session_id: z.string().uuid().optional(),
   provider: z.string().optional(),

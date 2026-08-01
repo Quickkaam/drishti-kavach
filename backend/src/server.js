@@ -84,6 +84,7 @@ const io = new Server(server, {
 // ─── Middleware ───────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: false, // configured separately
+  frameguard: { action: 'deny' }, // Sets X-Frame-Options: DENY
 }));
 
 app.use(cors({
@@ -101,7 +102,7 @@ app.use(cors({
 }));
 
 
-app.use(express.json({ limit: '50mb' }));  // Increased for ZIP upload base64 payloads
+app.use(express.json({ limit: '100mb' }));  // Increased for large AI inputs and ZIP uploads
 app.use(express.urlencoded({ extended: true }));
 
 // Trust proxy for accurate IP detection (render uses proxies)

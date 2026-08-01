@@ -272,7 +272,7 @@ ${webResults.map((r, i) => `${i + 1}. ${r.title ? r.title + ' — ' : ''}${r.sni
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: contextPrompt },
         ],
-        max_tokens: 1000,
+        max_tokens: 4096,
         temperature: 0.3,
       },
       {
@@ -381,7 +381,7 @@ async function callDeepSeek(userMessage, provider = null) {
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userMessage },
         ],
-        max_tokens: 500,
+        max_tokens: 4096,
         temperature: 0.3,
       },
       {
