@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const axios = require('axios');
 const fetch = require('node-fetch');
 const supabase = require('../db/supabase');
 const crypto = require('crypto');
