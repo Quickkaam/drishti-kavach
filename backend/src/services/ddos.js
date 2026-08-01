@@ -18,6 +18,8 @@ const THRESHOLDS = {
 
 // Minimum requests required before ratio checks (prevents false positives on low traffic)
 const MIN_REQUESTS_THRESHOLD = 20;
+// Minimum recent requests to trigger traffic spike alert (prevents false positives on very low traffic)
+const MIN_RECENT_REQUESTS = 5;
 
 async function getThresholds() {
   const { data } = await supabase
@@ -50,9 +52,16 @@ async function checkTrafficSpike(websiteId, io) {
 
     const recentPerMin = (recent || 0) / 5;
     const avgPerMin = (lastHour || 1) / 60;
-    const ratio = recentPerMin / avgPerMin;
+    const ratio = avgPerMin > 0 ? recentPerMin / avgPerMin : (recentPerMin > 0 ? Infinity : 0);
 
     const thresholds = await getThresholds();
+
+    // Skip traffic spike alerts if traffic is very low (prevents false positives)
+    // Need at least MIN_RECENT_REQUESTS in the last 5 minutes AND avg > 0.1 req/min (6/hour)
+    if (recent < MIN_RECENT_REQUESTS || avgPerMin < 0.1) {
+      console.log(`[DDoS SPIKE] Skipping - traffic too low (recent: ${recent}, avg/min: ${avgPerMin.toFixed(2)})`);
+      return;
+    }
 
     if (ratio >= thresholds.traffic_spike_critical && recent >= 10) {
       await createDDoSEvent(websiteId, 'critical', 'traffic_spike', {

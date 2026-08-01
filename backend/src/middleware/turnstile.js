@@ -71,6 +71,13 @@ const verifyTurnstile = (options = {}) => {
           timestamp: new Date().toISOString(),
         });
 
+        // If optional and verification failed, allow request to proceed anyway
+        // (user may have completed widget incorrectly or there was a transient issue)
+        if (optional) {
+          console.warn('Turnstile verification failed but optional=true, allowing request');
+          return next();
+        }
+
         return res.status(400).json({ 
           error: 'Turnstile verification failed', 
           code: 'TURNSTILE_FAILED',
@@ -93,8 +100,8 @@ const verifyTurnstile = (options = {}) => {
       console.error('Turnstile verification error:', error);
 
       // On network/timeout errors, allow optional bypass for UX
-      if (optional && error.code === 'ECONNABORTED') {
-        console.warn('Turnstile timeout, allowing request due to optional mode');
+      if (optional && (error.code === 'ECONNABORTED' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT')) {
+        console.warn('Turnstile service unavailable but optional=true, allowing request');
         return next();
       }
 
