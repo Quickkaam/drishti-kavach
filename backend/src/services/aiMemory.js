@@ -36,8 +36,15 @@ function extractMemory(question) {
  * Saves a memory entry for a specific user.
  */
 async function saveMemory(userId, memory) {
+  // Ensure userId is a number
+  const userIdNum = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+  if (isNaN(userIdNum)) {
+    console.error('[AI MEMORY] Invalid userId:', userId);
+    throw new Error('Invalid user ID');
+  }
+  
   const { error } = await supabase.from('ai_memory').insert({
-    user_id: userId,
+    user_id: userIdNum,
     memory,
   });
   if (error) {
