@@ -1,5 +1,5 @@
 // ============================================
-// Drishti Kavach — Legacy Log Route
+// Drishti Kavach â€” Legacy Log Route
 // (For backward compat with existing common.js)
 // ============================================
 
@@ -7,6 +7,11 @@ const express = require('express');
 const supabase = require('../db/supabase');
 
 const router = express.Router();
+
+// Handle preflight OPTIONS requests
+router.options('/', (_req, res) => {
+  res.status(204).end();
+});
 
 router.post('/', async (req, res) => {
   try {
