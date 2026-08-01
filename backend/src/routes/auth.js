@@ -137,7 +137,11 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
     }).catch(err => console.error('[LOG LOGIN EVENT]', err));
 
     // Log the login event (email, IP, enriched location)
-    logLoginEvent({ userId: user.id, email, req, io: req.io }).catch(console.error);
+    try {
+      logLoginEvent({ userId: user.id, email, req, io: req.io }).catch(console.error);
+    } catch (logErr) {
+      console.error('[LOG LOGIN EVENT ERROR]', logErr.message);
+    }
 
     // Send login notification
     const realIp = getRealIpAddress(req);
