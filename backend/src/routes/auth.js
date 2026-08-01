@@ -13,6 +13,7 @@ const { verifyTurnstile } = require('../middleware/turnstile');
 const { logAuthEvent, logError: logErrorLog } = require('../services/logging');
 const { notifyLogin, createDefaultPreferences, getNotificationPreferences } = require('../services/notifications');
 const { fetchIpInfo, getRealIpAddress } = require('../utils/loginLogger');
+const { logLoginEvent } = require('../utils/loginLogger');
 
 const router = express.Router();
 
@@ -134,6 +135,9 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
       success: true,
       userAgent: req.headers['user-agent']
     }).catch(err => console.error('[LOG LOGIN EVENT]', err));
+
+    // Log the login event (email, IP, enriched location)
+    logLoginEvent({ userId: user.id, email, req, io: req.io }).catch(console.error);
 
     // Send login notification
     const realIp = getRealIpAddress(req);
