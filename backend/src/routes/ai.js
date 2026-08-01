@@ -51,15 +51,22 @@ router.post('/chat', aiChatLimiter, validate(aiChatSchema), async (req, res) => 
     console.log('[AI Chat] Website ID:', website_id);
     console.log('[AI Chat] Question:', question?.substring(0, 50) + '...');
 
-    // Validate website_id
+    // Validate website_id and convert to number
     if (!website_id) {
       console.log('[AI Chat] ERROR: website_id is missing');
       return res.status(400).json({ error: 'website_id is required' });
     }
 
+    // Convert website_id to number if it's a string
+    const websiteIdNum = typeof website_id === 'string' ? parseInt(website_id, 10) : website_id;
+    if (isNaN(websiteIdNum)) {
+      console.log('[AI Chat] ERROR: website_id is not a valid number');
+      return res.status(400).json({ error: 'website_id must be a valid number' });
+    }
+
     const result = await aiService.chat(
       req.user.id,
-      website_id,
+      websiteIdNum,
       question,
       session_id || uuidv4(),
       provider

@@ -393,6 +393,16 @@ CREATE TABLE IF NOT EXISTS ai_sessions (
 CREATE INDEX IF NOT EXISTS idx_ai_sessions_user ON ai_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_ai_sessions_created ON ai_sessions(created_at);
 
+-- ─── 15a. AI MEMORY (Persistent user memories) ─────────────────
+CREATE TABLE IF NOT EXISTS ai_memory (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  memory TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_memory_user ON ai_memory(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_memory_created ON ai_memory(created_at);
+
 -- ─── 16. ASSISTANT SETTINGS ───────────────────────────────────
 CREATE TABLE IF NOT EXISTS assistant_settings (
   id BIGSERIAL PRIMARY KEY,
