@@ -5,7 +5,8 @@
 const express = require('express');
 const supabase = require('../db/supabase');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { callDeepSeek } = require('../services/ai');
+const { generateReport, generatePDFContent, getReports, getReportSummaries } = require('../services/aiReports');
+const { getGuardianStats, getAttackers, getAttackerDetail, manualBlockIP } = require('../services/aiGuardian');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -13,64 +14,141 @@ router.use(requireAuth);
 // GET /api/reports — List reports
 router.get('/', async (req, res) => {
   try {
-    const { data } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .eq('action', 'report_generated')
-      .order('created_at', { ascending: false })
-      .limit(50);
+    const { website_id } = req.query;
+    const { data } = await getReports(website_id || null, 50);
     res.json({ reports: data || [] });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch reports' });
   }
 });
 
-// POST /api/reports/generate — Generate a text report
+// POST /api/reports/generate — Generate a comprehensive AI security report
 router.post('/generate', requireRole('superadmin', 'admin', 'analyst'), async (req, res) => {
   try {
     const { website_id, period = '7d' } = req.body;
     const days = period === '30d' ? 30 : 7;
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-    let evQ = supabase.from('events').select('id', { count: 'exact', head: true }).gte('timestamp', since);
-    let secQ = supabase.from('security_events').select('event_type, severity').gte('created_at', since);
-    let blkQ = supabase.from('ip_block_list').select('id', { count: 'exact', head: true }).eq('is_active', true);
+    const report = await generateReport(website_id, period);
 
-    if (website_id) {
-      evQ = evQ.eq('website_id', website_id);
-      secQ = secQ.eq('website_id', website_id);
-      blkQ = blkQ.eq('website_id', website_id);
+    res.json({ 
+      report, 
+      period, 
+      generated_at: new Date().toISOString(),
+      message: 'Comprehensive AI security report generated successfully'
+    });
+  } catch (err) {
+    console.error('[REPORTS GENERATE]', err.message);
+    res.status(500).json({ error: 'Failed to generate report' });
+  }
+});
+
+// GET /api/reports/pdf — Get HTML for PDF generation
+router.get('/pdf/:websiteId/:period', requireRole('superadmin', 'admin'), async (req, res) => {
+  try {
+    const { websiteId, period } = req.params;
+    
+    const report = await generateReport(websiteId, period);
+    const html = generatePDFContent(report);
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate PDF content' });
+  }
+});
+
+// GET /api/reports/summary/:websiteId/:days — Get summary statistics
+router.get('/summary/:websiteId/:days', requireRole('superadmin', 'admin'), async (req, res) => {
+  try {
+    const { websiteId, days } = req.params;
+    const summaries = await getReportSummaries(websiteId, parseInt(days));
+    res.json({ summaries });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch report summaries' });
+  }
+});
+
+// GET /api/reports/guardian/stats — Get AI Guardian statistics
+router.get('/guardian/stats', requireRole('superadmin', 'admin'), async (req, res) => {
+  try {
+    const { website_id } = req.query;
+    const stats = await getGuardianStats(website_id || null);
+    res.json({ stats });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch guardian stats' });
+  }
+});
+
+// GET /api/reports/attackers — Get all attackers
+router.get('/attackers', requireRole('superadmin', 'admin'), async (req, res) => {
+  try {
+    const { website_id } = req.query;
+    const attackers = await getAttackers(website_id || null);
+    res.json({ attackers });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch attackers' });
+  }
+});
+
+// GET /api/reports/attacker/:ip — Get attacker details
+router.get('/attacker/:ip', requireRole('superadmin', 'admin'), async (req, res) => {
+  try {
+    const { ip } = req.params;
+    const { website_id } = req.query;
+    
+    if (!website_id) {
+      return res.status(400).json({ error: 'website_id is required' });
     }
 
-    const [{ count: events }, { data: sec }, { count: blocked }] = await Promise.all([evQ, secQ, blkQ]);
+    const attacker = await getAttackerDetail(ip, website_id);
+    if (!attacker) {
+      return res.status(404).json({ error: 'Attacker not found' });
+    }
 
-    const prompt = `Generate a professional security report for Drishti Kavach SOC Dashboard.
-
-Period: Last ${days} days
-Total Events: ${events || 0}
-Security Threats: ${sec?.length || 0}
-Blocked IPs: ${blocked || 0}
-Threat Breakdown: ${JSON.stringify((sec || []).reduce((acc, e) => {
-  acc[e.event_type] = (acc[e.event_type] || 0) + 1;
-  return acc;
-}, {}))}
-
-Write a 5-6 sentence professional security report covering: executive summary, key findings, threat analysis, and recommendations. Use formal language suitable for stakeholders.`;
-
-    const report = await callDeepSeek(prompt) || `Automated System Report\n\nPeriod: Last ${days} days\nTotal Events: ${events || 0}\nSecurity Threats: ${sec?.length || 0}\nBlocked IPs: ${blocked || 0}\n\nNote: Detailed AI analysis is currently unavailable. Please check system logs for more details.`;
-
-    // Log the report generation
-    await supabase.from('audit_logs').insert({
-      website_id: website_id || null,
-      admin_user: req.user.username,
-      action: 'report_generated',
-      details: { period, events, threats: sec?.length, blocked, report },
-      ip_address: req.ip,
-    });
-
-    res.json({ report, period, generated_at: new Date().toISOString() });
+    res.json({ attacker });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to generate report' });
+    res.status(500).json({ error: 'Failed to fetch attacker details' });
+  }
+});
+
+// POST /api/reports/manual-block — Manual IP block by admin
+router.post('/manual-block', requireRole('superadmin', 'admin'), async (req, res) => {
+  try {
+    const { ip, reason, website_id } = req.body;
+    
+    if (!ip || !website_id) {
+      return res.status(400).json({ error: 'IP and website_id are required' });
+    }
+
+    const result = await manualBlockIP(website_id, ip, reason, req.user.id);
+    
+    if (result.success) {
+      res.json({ 
+        success: true, 
+        message: result.message,
+        blocked_by: req.user.username
+      });
+    } else {
+      res.status(400).json({ error: result.error });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to block IP' });
+  }
+});
+
+// GET /api/reports/download/:websiteId/:period — Download HTML for PDF
+router.get('/download/:websiteId/:period', requireRole('superadmin', 'admin'), async (req, res) => {
+  try {
+    const { websiteId, period } = req.params;
+    
+    const report = await generateReport(websiteId, period);
+    const html = generatePDFContent(report);
+
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-Disposition', `attachment; filename="security-report-${websiteId}-${period}.html"`);
+    res.send(html);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate download' });
   }
 });
 

@@ -47,6 +47,24 @@ function startCronJobs() {
     }
   });
 
+  // Daily at 9:00 AM: AI Guardian daily summary
+  cron.schedule('0 9 * * *', async () => {
+    try {
+      const { data: websites } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('status', 'active');
+
+      for (const site of (websites || [])) {
+        const { getGuardianStats, generateReport } = require('../services/aiGuardian');
+        await getGuardianStats(site.id).catch(() => {});
+        await generateReport(site.id, '7d').catch(() => {});
+      }
+    } catch (err) {
+      console.error('[CRON AI GUARDIAN]', err.message);
+    }
+  });
+
   // Daily at 2:00 AM: Data cleanup (including 30-day log retention)
   cron.schedule('0 2 * * *', async () => {
     try {
