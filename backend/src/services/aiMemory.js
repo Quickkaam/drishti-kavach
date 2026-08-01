@@ -34,17 +34,27 @@ function extractMemory(question) {
 
 /**
  * Saves a memory entry for a specific user.
+ * Converts user_id from BIGINT to UUID format for the ai_memory table.
  */
 async function saveMemory(userId, memory) {
-  // Ensure userId is a number
+  // The ai_memory table uses UUID for user_id
+  // We convert BIGINT userId to UUID format: 00000000-0000-5000-8000-000000000001
+  // The last 4 digits encode the user_id (1 becomes 0001 in hex)
+  
   const userIdNum = typeof userId === 'string' ? parseInt(userId, 10) : userId;
   if (isNaN(userIdNum)) {
     console.error('[AI MEMORY] Invalid userId:', userId);
     throw new Error('Invalid user ID');
   }
   
+  // Convert user_id to UUID format
+  // Format: 00000000-0000-5000-8000-000000000001 for user_id=1
+  const userUUID = `00000000-0000-5000-8000-${userIdNum.toString(16).padStart(12, '0')}`;
+  
+  console.log('[AI MEMORY] Saving memory with user_id:', userUUID);
+  
   const { error } = await supabase.from('ai_memory').insert({
-    user_id: userIdNum,
+    user_id: userUUID,
     memory,
   });
   if (error) {
@@ -59,10 +69,19 @@ async function saveMemory(userId, memory) {
  * Returns them as a formatted string ready for context injection.
  */
 async function getUserMemories(userId) {
+  // Convert user_id to UUID format
+  const userIdNum = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+  const userUUID = userIdNum ? `00000000-0000-5000-8000-${userIdNum.toString(16).padStart(12, '0')}` : null;
+  
+  if (!userUUID) {
+    console.error('[AI MEMORY] Invalid userId for query:', userId);
+    return '';
+  }
+  
   const { data, error } = await supabase
     .from('ai_memory')
     .select('memory, created_at')
-    .eq('user_id', userId)
+    .eq('user_id', userUUID)
     .order('created_at', { ascending: false })
     .limit(30); // Keep last 30 memories
 
@@ -81,10 +100,19 @@ async function getUserMemories(userId) {
  * Deletes all memories for a user (reset command).
  */
 async function clearMemories(userId) {
+  // Convert user_id to UUID format
+  const userIdNum = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+  const userUUID = userIdNum ? `00000000-0000-5000-8000-${userIdNum.toString(16).padStart(12, '0')}` : null;
+  
+  if (!userUUID) {
+    console.error('[AI MEMORY] Invalid userId for clear:', userId);
+    return;
+  }
+  
   const { error } = await supabase
     .from('ai_memory')
     .delete()
-    .eq('user_id', userId);
+    .eq('user_id', userUUID);
   if (error) console.error('[AI MEMORY] Failed to clear memories:', error.message);
 }
 
