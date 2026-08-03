@@ -6,15 +6,15 @@ import React, { useState } from 'react';
 import api from '../api/client';
 
 export default function Reports() {
-  const [period, setPeriod] = useState('7d');
+  const [period, setPeriod] = useState('30d');
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const generateReport = async () => {
     setLoading(true);
     try {
-      const { data } = await api.post('/reports/generate', { period });
-      setReport({ content: data.report, generated_at: data.generated_at, period: data.period });
+      const { data } = await api.get(`/reports/download?period=${period}`);
+      setReport({ content: data, generated_at: new Date().toISOString(), period: period });
     } catch (e) { alert(e.response?.data?.error || 'Failed to generate report'); }
     finally { setLoading(false); }
   };
