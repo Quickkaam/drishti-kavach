@@ -5,13 +5,10 @@
 
 const supabase = require('../db/supabase');
 const { getIpIntel } = require('./ipIntel');
-const { autoBlockIp } = require('./ddos');
-const alertService = require('./alerts');
 const { sendNotification, TYPES, SEVERITY, CATEGORIES, ROLES } = require('./notifications');
 
 const GUARDIAN_MODE_ENABLED = (process.env.GUARDIAN_MODE_ENABLED || 'true').toLowerCase() === 'true';
 const AUTO_BLOCK_THRESHOLD = parseInt(process.env.AUTO_BLOCK_THRESHOLD || '80', 10);
-const AUTO_INVESTIGATE_MIN_SEVERITY = process.env.AUTO_INVESTIGATE_MIN_SEVERITY || 'medium';
 
 /**
  * Check if Guardian Mode is enabled
@@ -32,7 +29,6 @@ async function autoInvestigate(eventId, websiteId, ip, io) {
   try {
     console.log('[AI GUARDIAN] Auto-investigating event:', eventId, 'IP:', ip);
 
-    // Get event details
     const { data: event } = await supabase
       .from('security_events')
       .select('*')
@@ -44,15 +40,11 @@ async function autoInvestigate(eventId, websiteId, ip, io) {
       return null;
     }
 
-    // Get IP intelligence
     const ipIntel = await getIpIntel(ip);
-
-    // Determine threat level
     const threatScore = ipIntel.threat_score || 0;
     const abuseScore = ipIntel.abuse_confidence || 0;
     const severity = event.severity || 'low';
 
-    // Decide action based on scores
     let recommendation = 'monitor';
     let reason = `Threat score: ${threatScore}, Abuse confidence: ${abuseScore}`;
 
@@ -64,7 +56,6 @@ async function autoInvestigate(eventId, websiteId, ip, io) {
       reason += '. High severity event requires manual review';
     }
 
-    // Save AI decision
     await supabase.from('ai_decisions').insert({
       website_id: websiteId,
       event_id: eventId,
@@ -76,19 +67,17 @@ async function autoInvestigate(eventId, websiteId, ip, io) {
       model_used: 'AI_Guardian_Auto',
     });
 
-    // Auto-block if threshold exceeded
     if (recommendation === 'block') {
       console.log('[AI GUARDIAN] Auto-blocking IP:', ip);
-      await autoBlockIp(websiteId, ip, `AI Guardian: ${reason}`, io);
+      const { autoBlockIp: ddosAutoBlockIp } = require('./ddos');
+      await ddosAutoBlockIp(websiteId, ip, `AI Guardian: ${reason}`, io);
 
-      // Update decision
       await supabase
         .from('ai_decisions')
         .update({ action_taken: true, action_result: 'IP blocked' })
         .eq('event_id', eventId)
         .eq('ip', ip);
 
-      // Send notification
       await sendNotification({
         title: `🛡️ AI Guardian Auto-Blocked IP`,
         message: `IP ${ip} automatically blocked for website ${websiteId}`,
@@ -106,7 +95,6 @@ async function autoInvestigate(eventId, websiteId, ip, io) {
         io
       });
     } else if (recommendation === 'escalate') {
-      // Send alert for manual review
       await sendNotification({
         title: `⚠️ AI Guardian: High Severity Alert`,
         message: `Security event ${eventId} requires attention. IP: ${ip}, Severity: ${severity}`,
@@ -129,25 +117,6 @@ async function autoInvestigate(eventId, websiteId, ip, io) {
   } catch (err) {
     console.error('[AI GUARDIAN] Auto-investigation error:', err.message);
     return null;
-  }
-}
-
-/**
- * Auto-block an IP based on threat intelligence
- */
-async function autoBlockIp(websiteId, ip, reason, io) {
-  if (!isGuardianEnabled()) {
-    console.log('[AI GUARDIAN] Guardian mode disabled, skipping auto-block');
-    return false;
-  }
-
-  try {
-    await autoBlockIp(websiteId, ip, reason, io);
-    console.log('[AI GUARDIAN] Auto-blocked IP:', ip, 'for website:', websiteId);
-    return true;
-  } catch (err) {
-    console.error('[AI GUARDIAN] Auto-block error:', err.message);
-    return false;
   }
 }
 
@@ -193,7 +162,6 @@ async function generateDailySummary(websiteId) {
         .limit(10),
     ]);
 
-    // Generate report content
     let summary = `**Drishti Kavach Daily Security Summary (Last 24h)**\n\n`;
     summary += `📊 *Stats:*\n`;
     summary += `- Total Events: ${events || 0}\n`;
@@ -210,7 +178,6 @@ async function generateDailySummary(websiteId) {
 
     summary += `🛡️ *Status: ${threats > 0 ? 'ACTIVE MONITORING' : 'CLEAN'}*`;
 
-    // Send notification
     await sendNotification({
       title: '📊 Drishti Kavach — Daily Security Summary',
       message: summary,
@@ -233,21 +200,14 @@ async function generateDailySummary(websiteId) {
   }
 }
 
-/**
- * Get Guardian Mode status
- */
 function getStatus() {
   return {
     enabled: isGuardianEnabled(),
     autoBlockThreshold: AUTO_BLOCK_THRESHOLD,
-    autoInvestigateMinSeverity: AUTO_INVESTIGATE_MIN_SEVERITY,
     lastUpdate: new Date().toISOString(),
   };
 }
 
-/**
- * Toggle Guardian Mode
- */
 function toggleEnabled(enabled) {
   const newStatus = enabled === true || enabled === 'true';
   console.log('[AI GUARDIAN] Guardian mode toggled:', newStatus);
@@ -257,7 +217,6 @@ function toggleEnabled(enabled) {
 module.exports = {
   isGuardianEnabled,
   autoInvestigate,
-  autoBlockIp,
   generateDailySummary,
   getStatus,
   toggleEnabled,
