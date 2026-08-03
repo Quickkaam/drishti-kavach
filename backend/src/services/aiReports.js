@@ -12,10 +12,16 @@ const { callDeepSeek } = require('./ai');
 async function generateReport(websiteId, period = '30d') {
   console.log('[AI REPORTS] Generating report for website:', websiteId, 'period:', period);
 
+  // Validate websiteId
+  if (!websiteId) {
+    throw new Error('Website ID is required');
+  }
+
   try {
     // Calculate date range
     const hours = period === '7d' ? 168 : 720;
     const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    console.log('[AI REPORTS] Fetching data with since:', since);
 
     // Fetch all data
     const [
