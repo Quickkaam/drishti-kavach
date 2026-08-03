@@ -13,17 +13,33 @@ const router = express.Router();
 // GET /api/reports/status - Get AI report generation status
 router.get('/status', requireAuth, async (req, res) => {
   try {
-    const { data: website } = await supabase
-      .from('websites')
-      .select('id')
-      .eq('domain', 'quickkaam.in')
-      .single();
-
-    if (!website) {
-      return res.status(404).json({ error: 'Website not found' });
+    // First try to get website by domain, then by ID from query
+    let websiteId = req.query.website_id;
+    
+    if (!websiteId) {
+      const { data: website } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('domain', 'quickkaam.in')
+        .single();
+      websiteId = website?.id;
     }
 
-    const report = await getReportData(website.id, '30d');
+    if (!websiteId) {
+      // Try to get any active website as fallback
+      const { data: websites } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('status', 'active')
+        .limit(1);
+      websiteId = websites?.[0]?.id;
+    }
+
+    if (!websiteId) {
+      return res.status(404).json({ error: 'No website found. Please add a website first.' });
+    }
+
+    const report = await getReportData(websiteId, '30d');
     res.json({ status: 'ready', report: report.preview });
   } catch (err) {
     console.error('[REPORTS STATUS]', err.message);
@@ -49,7 +65,17 @@ router.get('/generate', requireAuth, async (req, res) => {
     }
 
     if (!websiteId) {
-      return res.status(400).json({ error: 'Website ID required' });
+      // Try to get any active website as fallback
+      const { data: websites } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('status', 'active')
+        .limit(1);
+      websiteId = websites?.[0]?.id;
+    }
+
+    if (!websiteId) {
+      return res.status(400).json({ error: 'No website found. Please add a website first.' });
     }
 
     const report = await generateReport(websiteId, periodValid);
@@ -78,7 +104,17 @@ router.get('/preview', requireAuth, async (req, res) => {
     }
 
     if (!websiteId) {
-      return res.status(400).json({ error: 'Website ID required' });
+      // Try to get any active website as fallback
+      const { data: websites } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('status', 'active')
+        .limit(1);
+      websiteId = websites?.[0]?.id;
+    }
+
+    if (!websiteId) {
+      return res.status(400).json({ error: 'No website found. Please add a website first.' });
     }
 
     const report = await getReportData(websiteId, periodValid);
@@ -107,7 +143,17 @@ router.get('/download', requireAuth, async (req, res) => {
     }
 
     if (!websiteId) {
-      return res.status(400).json({ error: 'Website ID required' });
+      // Try to get any active website as fallback
+      const { data: websites } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('status', 'active')
+        .limit(1);
+      websiteId = websites?.[0]?.id;
+    }
+
+    if (!websiteId) {
+      return res.status(400).json({ error: 'No website found. Please add a website first.' });
     }
 
     const textReport = await exportReportAsText(websiteId, periodValid);
@@ -140,7 +186,17 @@ router.get('/full', requireAuth, async (req, res) => {
     }
 
     if (!websiteId) {
-      return res.status(400).json({ error: 'Website ID required' });
+      // Try to get any active website as fallback
+      const { data: websites } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('status', 'active')
+        .limit(1);
+      websiteId = websites?.[0]?.id;
+    }
+
+    if (!websiteId) {
+      return res.status(400).json({ error: 'No website found. Please add a website first.' });
     }
 
     const report = await generateReport(websiteId, periodValid);

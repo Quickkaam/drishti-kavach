@@ -27,7 +27,6 @@ async function generateReport(websiteId, period = '30d') {
       { data: securityEventsData },
       { data: ddosEventsData },
       { data: blockedIpsData },
-      { data: topSecurityTypes },
     ] = await Promise.all([
       supabase
         .from('events')
@@ -73,13 +72,6 @@ async function generateReport(websiteId, period = '30d') {
         .select('*')
         .eq('website_id', websiteId)
         .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(50),
-      supabase
-        .from('security_events')
-        .select('event_type, severity')
-        .eq('website_id', websiteId)
-        .gte('created_at', since)
         .order('created_at', { ascending: false })
         .limit(50),
     ]);
@@ -137,40 +129,166 @@ async function generateReport(websiteId, period = '30d') {
  * Generate AI-powered analysis of the security data
  */
 async function generateAiAnalysis(reportData) {
-  const { summary, securityTypes, severityCounts, recentSecurityEvents } = reportData;
+  const { summary, securityTypes, severityCounts, recentSecurityEvents, recentDdosEvents, activeBlockList } = reportData;
+
+  // Get all security event types with full details
+  const allSecurityTypes = {};
+  (recentSecurityEvents || []).forEach(e => {
+    const type = e.event_type || 'unknown';
+    allSecurityTypes[type] = (allSecurityTypes[type] || 0) + 1;
+  });
+
+  // Get attack details
+  const ddosDetails = (recentDdosEvents || []).map(e => ({
+    type: e.attack_type,
+    severity: e.severity,
+    timestamp: e.created_at,
+    details: e.details
+  }));
+
+  // Get blocked IPs with reasons
+  const blockedIpDetails = (activeBlockList || []).map(ip => ({
+    ip: ip.ip,
+    reason: ip.reason,
+    severity: ip.severity,
+    blocked_by: ip.blocked_by
+  }));
 
   const prompt = `
 Generate a comprehensive security analysis for a SOC Dashboard.
 
-Summary Statistics:
-- Total Events (Last 30 Days): ${summary.totalEvents || 0}
+SUMMARY STATISTICS (Last 30 Days):
+- Total Events (Page Views/Interactions): ${summary.totalEvents || 0}
 - Security Threats Detected: ${summary.securityEvents || 0}
 - DDoS Events: ${summary.ddosEvents || 0}
-- Blocked IPs: ${summary.blockedIps || 0}
+- Active IP Blocks: ${summary.blockedIps || 0}
 - Form Submissions: ${summary.formSubmissions || 0}
 
-Threat Breakdown by Type:
-${Object.entries(securityTypes || {})
-  .map(([type, count]) => `- ${type}: ${count}`)
-  .join('\n')}
+THREAT BREAKDOWN BY TYPE:
+${Object.entries(allSecurityTypes || {}).map(([type, count]) => `- ${type}: ${count}`).join('\n') || 'No security events detected'}
 
-Severity Distribution:
-${Object.entries(severityCounts || {})
-  .map(([level, count]) => `- ${level.toUpperCase()}: ${count}`)
-  .join('\n')}
+SEVERITY DISTRIBUTION:
+${Object.entries(severityCounts || {}).map(([level, count]) => `- ${level.toUpperCase()}: ${count}`).join('\n')}
 
-Recent Security Events:
-${(recentSecurityEvents || []).slice(0, 5).map((e, i) => `${i + 1}. ${e.event_type} (${e.severity}) from ${e.user_ip}`).join('\n')}
+ATTACK DETAILS:
+${ddosDetails.length > 0 ? ddosDetails.map((d, i) => `${i + 1}. ${d.type} (${d.severity}) at ${d.timestamp}\n   Details: ${JSON.stringify(d.details)}`).join('\n\n') : 'No DDoS attacks detected'}
 
-Analyze this security data and provide:
-1. Overall security posture assessment (Low/Medium/High/Critical)
-2. Key findings and insights
-3. Specific threat recommendations
-4. Compliance status (GDPR, etc.)
-5. Actionable recommendations
+ACTIVE BLOCKED IPS:
+${blockedIpDetails.length > 0 ? blockedIpDetails.map((ip, i) => `${i + 1}. IP: ${ip.ip}\n   Reason: ${ip.reason}\n   Severity: ${ip.severity}\n   Blocked By: ${ip.blocked_by}`).join('\n\n') : 'No IPs currently blocked'}
 
-Respond in JSON format:
+COMPREHENSIVE SECURITY ANALYSIS REQUESTED:
+Please provide a COMPLETE A-Z security report with:
+
+1. EXECUTIVE SUMMARY
+   - Overall security posture (Low/Medium/High/Critical)
+   - Key metrics summary
+   - Immediate risks
+
+2. THREAT ANALYSIS
+   - Attack types detected (SQLi, XSS, Honeypot, DDoS, etc.)
+   - Geographic distribution of threats
+   - Targeted endpoints
+   - Attack patterns and trends
+
+3. DETAILED ATTACK BREAKDOWN
+   - DDoS attack types (Traffic Spike, IP Flood, Botnet, Geo Spike)
+   - Web attack types (SQL Injection, Cross-Site Scripting, Honeypot triggers)
+   - Frequency and severity of each attack type
+
+4. BLOCKED IP ANALYSIS
+   - Top 10 blocked IPs with reasons
+   - Blocked IP statistics
+   - Geographic sources of blocked IPs
+
+5. FORM SUBMISSION ANALYSIS
+   - Total form submissions
+   - Spam detection
+   - Legitimate vs suspicious submissions
+
+6. SECURITY EVENTS ANALYSIS
+   - Top security events by severity
+   - Most attacked endpoints
+   - Most common attack vectors
+
+7. COMPLIANCE STATUS
+   - GDPR compliance check
+   - Data protection compliance
+   - Regulatory requirements
+
+8. RECOMMENDATIONS
+   - Immediate actions required
+   - Medium-term improvements
+   - Long-term security enhancements
+
+9. AI INSIGHTS
+   - Pattern detection
+   - Anomaly detection
+   - Predictive threat assessment
+
+10. DETAILED FINDINGS
+    - Complete breakdown of all security events
+    - Full IP intelligence for blocked IPs
+    - Timeline of critical events
+
+Respond in JSON format with ALL sections:
 {
+  "executive_summary": {
+    "overall_posture": "Low|Medium|High|Critical",
+    "key_metrics": "...",
+    "immediate_risks": "..."
+  },
+  "threat_analysis": {
+    "attack_types_detected": "...",
+    "geographic_distribution": "...",
+    "targeted_endpoints": "...",
+    "attack_patterns": "..."
+  },
+  "ddos_attack_details": {
+    "types_detected": "...",
+    "frequency": "...",
+    "mitigation_actions": "..."
+  },
+  "web_attack_details": {
+    "sql_injection": "...",
+    "xss_attempts": "...",
+    "honeypot_triggers": "...",
+    "other_attacks": "..."
+  },
+  "blocked_ip_analysis": {
+    "top_10_blocked": "...",
+    "statistics": "...",
+    "geographic_sources": "..."
+  },
+  "form_submission_analysis": {
+    "total_submissions": "...",
+    "spam_detection": "...",
+    "legitimate_vs_suspicious": "..."
+  },
+  "security_events_analysis": {
+    "top_events_by_severity": "...",
+    "most_attacked_endpoints": "...",
+    "attack_vectors": "..."
+  },
+  "compliance_status": {
+    "gdpr_compliance": "...",
+    "data_protection": "...",
+    "regulatory_requirements": "..."
+  },
+  "recommendations": {
+    "immediate_actions": "...",
+    "medium_term_improvements": "...",
+    "long_term_security": "..."
+  },
+  "ai_insights": {
+    "pattern_detection": "...",
+    "anomaly_detection": "...",
+    "predictive_assessment": "..."
+  },
+  "detailed_findings": {
+    "complete_event_breakdown": "...",
+    "ip_intelligence_summary": "...",
+    "timeline_of_events": "..."
+  },
   "threat_assessment": "...",
   "severity_rating": "Low|Medium|High|Critical",
   "recommendation": "...",
