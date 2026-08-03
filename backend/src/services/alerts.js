@@ -391,3 +391,40 @@ module.exports = {
   SEVERITY_EMOJI,
   SEVERITY_COLOR
 };
+/**
+ * Test alert to verify Slack and Telegram are working
+ */
+async function testAlerts() {
+  console.log('[TEST ALERTS] Sending test alerts...');
+
+  const testMessage = `*🔔 Drishti Kavach Test Alert*\n\nThis is a test to verify Slack and Telegram alerts are working properly.\n\n*Status:* 🟢 Working\n*Timestamp:* ${new Date().toISOString()}`;
+
+  await Promise.allSettled([
+    sendSlack({
+      title: '🔔 Drishti Kavach Test Alert',
+      message: 'This is a test to verify Slack alerts are working properly. Status: Working',
+      severity: 'info'
+    }),
+    sendTelegram({
+      title: '🔔 Drishti Kavach Test Alert',
+      message: 'This is a test to verify Telegram alerts are working properly.\n\n*Status:* Working',
+      severity: 'info'
+    })
+  ]);
+
+  console.log('[TEST ALERTS] Test alerts sent');
+}
+
+module.exports = {
+  sendAlert,
+  sendSlack,
+  sendTelegram,
+  sendCriticalAlert,
+  sendSecurityAlert,
+  sendDdosAlert,
+  sendFormAlert,
+  sendLoginAlert,
+  testAlerts,
+  SEVERITY_EMOJI,
+  SEVERITY_COLOR
+};

@@ -9,6 +9,7 @@ const { generateDailySummary } = require('../services/ai');
 const { generateDailySummary: generateGuardianSummary } = require('../services/aiGuardian');
 const { checkTrafficSpike, checkIpFlood } = require('../services/ddos');
 const { cleanupOldLogs } = require('../services/logging');
+const { sendAlert } = require('../services/alerts');
 
 function startCronJobs() {
   console.log('[CRON] Starting scheduled jobs...');
@@ -43,6 +44,14 @@ function startCronJobs() {
       for (const site of (websites || [])) {
         await generateDailySummary(site.id).catch(() => {});
       }
+      
+      // Send daily summary to Slack/Telegram
+      const summary = `*📊 Drishti Kavach Daily Summary*\n\nAI summaries generated for all websites.\n\nTime: 8:00 AM UTC\nStatus: 🟢 Active`;
+      await sendAlert({
+        title: '📊 Drishti Kavach Daily Summary',
+        message: summary,
+        severity: 'info'
+      });
     } catch (err) {
       console.error('[CRON AI SUMMARY]', err.message);
     }
@@ -59,6 +68,13 @@ function startCronJobs() {
       for (const site of (websites || [])) {
         await generateGuardianSummary(site.id).catch(() => {});
       }
+      
+      // Send guardian summary to Slack/Telegram
+      await sendAlert({
+        title: '🛡️ AI Guardian Daily Summary',
+        message: 'AI Guardian has completed its daily security assessment for all websites.\n\nStatus: 🟢 Protected',
+        severity: 'info'
+      });
     } catch (err) {
       console.error('[CRON AI GUARDIAN]', err.message);
     }
