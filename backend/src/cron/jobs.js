@@ -6,6 +6,7 @@ const cron = require('node-cron');
 const supabase = require('../db/supabase');
 const { runCleanup } = require('../routes/cleanup');
 const { generateDailySummary } = require('../services/ai');
+const { generateDailySummary: generateGuardianSummary } = require('../services/aiGuardian');
 const { checkTrafficSpike, checkIpFlood } = require('../services/ddos');
 const { cleanupOldLogs } = require('../services/logging');
 
@@ -47,7 +48,7 @@ function startCronJobs() {
     }
   });
 
-  // Daily at 9:00 AM: AI Guardian daily summary
+  // Daily at 9:00 AM: AI Guardian daily summary (use correct export)
   cron.schedule('0 9 * * *', async () => {
     try {
       const { data: websites } = await supabase
@@ -56,9 +57,7 @@ function startCronJobs() {
         .eq('status', 'active');
 
       for (const site of (websites || [])) {
-        const { getGuardianStats, generateReport } = require('../services/aiGuardian');
-        await getGuardianStats(site.id).catch(() => {});
-        await generateReport(site.id, '7d').catch(() => {});
+        await generateGuardianSummary(site.id).catch(() => {});
       }
     } catch (err) {
       console.error('[CRON AI GUARDIAN]', err.message);

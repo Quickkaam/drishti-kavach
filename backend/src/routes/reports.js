@@ -1,154 +1,153 @@
 // ============================================
-// Drishti Kavach — Reports Routes
+// Drishti Kavach — Reports API Routes
 // ============================================
 
 const express = require('express');
+const { v4: uuidv4 } = require('uuid');
 const supabase = require('../db/supabase');
-const { requireAuth, requireRole } = require('../middleware/auth');
-const { generateReport, generatePDFContent, getReports, getReportSummaries } = require('../services/aiReports');
-const { getGuardianStats, getAttackers, getAttackerDetail, manualBlockIP } = require('../services/aiGuardian');
+const { requireAuth } = require('../middleware/auth');
+const { generateReport, getReportData, exportReportAsText } = require('../services/aiReports');
 
 const router = express.Router();
-router.use(requireAuth);
 
-// GET /api/reports — List reports
-router.get('/', async (req, res) => {
+// GET /api/reports/status - Get AI report generation status
+router.get('/status', requireAuth, async (req, res) => {
   try {
-    const { website_id } = req.query;
-    const { data } = await getReports(website_id || null, 50);
-    res.json({ reports: data || [] });
+    const { data: website } = await supabase
+      .from('websites')
+      .select('id')
+      .eq('domain', 'quickkaam.in')
+      .single();
+
+    if (!website) {
+      return res.status(404).json({ error: 'Website not found' });
+    }
+
+    const report = await getReportData(website.id, '30d');
+    res.json({ status: 'ready', report: report.preview });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch reports' });
+    console.error('[REPORTS STATUS]', err.message);
+    res.status(500).json({ error: 'Failed to get report status' });
   }
 });
 
-// POST /api/reports/generate — Generate a comprehensive AI security report
-router.post('/generate', requireRole('superadmin', 'admin', 'analyst'), async (req, res) => {
+// GET /api/reports/generate - Generate new report
+router.get('/generate', requireAuth, async (req, res) => {
   try {
-    const { website_id, period = '7d' } = req.body;
-    const days = period === '30d' ? 30 : 7;
+    const { period = '30d', website_id: websiteIdQuery } = req.query;
+    const periodValid = ['7d', '30d'].includes(period) ? period : '30d';
 
-    const report = await generateReport(website_id, period);
+    // Get website_id from query or use default
+    let websiteId = websiteIdQuery;
+    if (!websiteId) {
+      const { data: website } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('domain', 'quickkaam.in')
+        .single();
+      websiteId = website?.id;
+    }
 
-    res.json({ 
-      report, 
-      period, 
-      generated_at: new Date().toISOString(),
-      message: 'Comprehensive AI security report generated successfully'
-    });
+    if (!websiteId) {
+      return res.status(400).json({ error: 'Website ID required' });
+    }
+
+    const report = await generateReport(websiteId, periodValid);
+    res.json({ report, generatedAt: new Date().toISOString() });
   } catch (err) {
     console.error('[REPORTS GENERATE]', err.message);
     res.status(500).json({ error: 'Failed to generate report' });
   }
 });
 
-// GET /api/reports/pdf — Get HTML for PDF generation
-router.get('/pdf/:websiteId/:period', requireRole('superadmin', 'admin'), async (req, res) => {
+// GET /api/reports/preview - Get report preview data
+router.get('/preview', requireAuth, async (req, res) => {
   try {
-    const { websiteId, period } = req.params;
-    
-    const report = await generateReport(websiteId, period);
-    const html = generatePDFContent(report);
+    const { period = '30d', website_id: websiteIdQuery } = req.query;
+    const periodValid = ['7d', '30d'].includes(period) ? period : '30d';
 
-    res.setHeader('Content-Type', 'text/html');
-    res.send(html);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to generate PDF content' });
-  }
-});
-
-// GET /api/reports/summary/:websiteId/:days — Get summary statistics
-router.get('/summary/:websiteId/:days', requireRole('superadmin', 'admin'), async (req, res) => {
-  try {
-    const { websiteId, days } = req.params;
-    const summaries = await getReportSummaries(websiteId, parseInt(days));
-    res.json({ summaries });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch report summaries' });
-  }
-});
-
-// GET /api/reports/guardian/stats — Get AI Guardian statistics
-router.get('/guardian/stats', requireRole('superadmin', 'admin'), async (req, res) => {
-  try {
-    const { website_id } = req.query;
-    const stats = await getGuardianStats(website_id || null);
-    res.json({ stats });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch guardian stats' });
-  }
-});
-
-// GET /api/reports/attackers — Get all attackers
-router.get('/attackers', requireRole('superadmin', 'admin'), async (req, res) => {
-  try {
-    const { website_id } = req.query;
-    const attackers = await getAttackers(website_id || null);
-    res.json({ attackers });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch attackers' });
-  }
-});
-
-// GET /api/reports/attacker/:ip — Get attacker details
-router.get('/attacker/:ip', requireRole('superadmin', 'admin'), async (req, res) => {
-  try {
-    const { ip } = req.params;
-    const { website_id } = req.query;
-    
-    if (!website_id) {
-      return res.status(400).json({ error: 'website_id is required' });
+    // Get website_id from query or use default
+    let websiteId = websiteIdQuery;
+    if (!websiteId) {
+      const { data: website } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('domain', 'quickkaam.in')
+        .single();
+      websiteId = website?.id;
     }
 
-    const attacker = await getAttackerDetail(ip, website_id);
-    if (!attacker) {
-      return res.status(404).json({ error: 'Attacker not found' });
+    if (!websiteId) {
+      return res.status(400).json({ error: 'Website ID required' });
     }
 
-    res.json({ attacker });
+    const report = await getReportData(websiteId, periodValid);
+    res.json({ preview: report.preview });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch attacker details' });
+    console.error('[REPORTS PREVIEW]', err.message);
+    res.status(500).json({ error: 'Failed to get report preview' });
   }
 });
 
-// POST /api/reports/manual-block — Manual IP block by admin
-router.post('/manual-block', requireRole('superadmin', 'admin'), async (req, res) => {
+// GET /api/reports/download - Download report as text (for PDF generation)
+router.get('/download', requireAuth, async (req, res) => {
   try {
-    const { ip, reason, website_id } = req.body;
-    
-    if (!ip || !website_id) {
-      return res.status(400).json({ error: 'IP and website_id are required' });
+    const { period = '30d', website_id: websiteIdQuery } = req.query;
+    const periodValid = ['7d', '30d'].includes(period) ? period : '30d';
+
+    // Get website_id from query or use default
+    let websiteId = websiteIdQuery;
+    if (!websiteId) {
+      const { data: website } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('domain', 'quickkaam.in')
+        .single();
+      websiteId = website?.id;
     }
 
-    const result = await manualBlockIP(website_id, ip, reason, req.user.id);
-    
-    if (result.success) {
-      res.json({ 
-        success: true, 
-        message: result.message,
-        blocked_by: req.user.username
-      });
-    } else {
-      res.status(400).json({ error: result.error });
+    if (!websiteId) {
+      return res.status(400).json({ error: 'Website ID required' });
     }
+
+    const textReport = await exportReportAsText(websiteId, periodValid);
+    const timestamp = new Date().toISOString().slice(0, 10);
+
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="security-report-${timestamp}-${periodValid}.txt"`);
+    res.send(textReport);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to block IP' });
+    console.error('[REPORTS DOWNLOAD]', err.message);
+    res.status(500).json({ error: 'Failed to download report' });
   }
 });
 
-// GET /api/reports/download/:websiteId/:period — Download HTML for PDF
-router.get('/download/:websiteId/:period', requireRole('superadmin', 'admin'), async (req, res) => {
+// GET /api/reports/full - Get complete report data
+router.get('/full', requireAuth, async (req, res) => {
   try {
-    const { websiteId, period } = req.params;
-    
-    const report = await generateReport(websiteId, period);
-    const html = generatePDFContent(report);
+    const { period = '30d', website_id: websiteIdQuery } = req.query;
+    const periodValid = ['7d', '30d'].includes(period) ? period : '30d';
 
-    res.setHeader('Content-Type', 'text/html');
-    res.setHeader('Content-Disposition', `attachment; filename="security-report-${websiteId}-${period}.html"`);
-    res.send(html);
+    // Get website_id from query or use default
+    let websiteId = websiteIdQuery;
+    if (!websiteId) {
+      const { data: website } = await supabase
+        .from('websites')
+        .select('id')
+        .eq('domain', 'quickkaam.in')
+        .single();
+      websiteId = website?.id;
+    }
+
+    if (!websiteId) {
+      return res.status(400).json({ error: 'Website ID required' });
+    }
+
+    const report = await generateReport(websiteId, periodValid);
+    res.json({ report, generatedAt: new Date().toISOString() });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to generate download' });
+    console.error('[REPORTS FULL]', err.message);
+    res.status(500).json({ error: 'Failed to get full report' });
   }
 });
 
