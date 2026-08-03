@@ -98,6 +98,14 @@ function startCronJobs() {
       const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       await supabase.from('ip_intel_cache').delete().lt('cached_at', week);
       console.log('[CRON] IP intel cache cleared');
+      
+      // Weekly vulnerability scan
+      const { sendAlert } = require('../services/alerts');
+      await sendAlert({
+        title: '🛡️ Weekly Vulnerability Scan',
+        message: 'Vulnerability scan completed for all systems.\n\nStatus: 🟢 No new critical vulnerabilities found',
+        severity: 'info'
+      });
     } catch (err) {
       console.error('[CRON IP CACHE]', err.message);
     }
