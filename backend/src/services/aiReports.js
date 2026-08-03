@@ -118,7 +118,19 @@ async function generateReport(websiteId, period = '30d') {
     };
 
     // Generate AI analysis
-    const analysis = await generateAiAnalysis(reportData);
+    console.log('[AI REPORTS] Generating AI analysis...');
+    const analysis = await generateAiAnalysis(reportData).catch(err => {
+      console.error('[AI REPORTS] AI analysis error:', err.message);
+      // Return fallback analysis if AI call fails
+      return {
+        threat_assessment: 'AI analysis unavailable',
+        severity_rating: 'Unknown',
+        recommendation: 'AI analysis failed - check configuration',
+        compliance_status: 'Unknown',
+        assessment: 'Automated analysis unavailable',
+        motto: 'Vigilia et Tutela',
+      };
+    });
 
     // Combine data
     const finalReport = {
