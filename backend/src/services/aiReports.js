@@ -80,7 +80,10 @@ async function generateReport(websiteId, period = '30d') {
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(50),
-    ]);
+    ]).catch(err => {
+      console.error('[AI REPORTS] Database fetch error:', err);
+      throw err;
+    });
 
     // Process data for AI analysis
     const securityTypes = {};
