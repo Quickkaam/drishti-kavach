@@ -104,11 +104,14 @@ async function sendSlack({ title, message, severity = 'info', websiteId = null, 
  * Send formatted alert to Telegram with markdown
  */
 async function sendTelegram({ title, message, severity = 'info', websiteId = null, attachments = [] }) {
-  if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
-    console.log('[TELEGRAM] Bot token or chat ID not configured');
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
+    console.log('[TELEGRAM] Bot token not configured');
     return;
   }
-
+  
+  // Use TELEGRAM_CHAT_ID if set, otherwise use default
+  const chatId = process.env.TELEGRAM_CHAT_ID || '@White_wolf227';
+  
   const emoji = SEVERITY_EMOJI[severity] || 'ℹ️';
   const timestamp = new Date().toLocaleString('en-IN', { 
     timeZone: 'Asia/Kolkata',
@@ -153,7 +156,7 @@ async function sendTelegram({ title, message, severity = 'info', websiteId = nul
     const response = await axios.post(
       `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
       {
-        chat_id: process.env.TELEGRAM_CHAT_ID,
+        chat_id: chatId,
         text: markdown,
         parse_mode: 'Markdown',
         disable_web_page_preview: true,
@@ -175,7 +178,8 @@ async function sendTelegram({ title, message, severity = 'info', websiteId = nul
         error: err.message,
         title,
         severity,
-        websiteId 
+        websiteId,
+        chatId 
       } 
     });
   }
