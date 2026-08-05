@@ -9,6 +9,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const aiService = require('../services/ai');
 const rateLimit = require('express-rate-limit');
 const { validate, aiChatSchema } = require('../middleware/validate');
+const { sendAlert } = require('../services/alerts');
 
 const router = express.Router();
 
@@ -135,6 +136,20 @@ router.get('/settings', requireRole('admin'), async (req, res) => {
   }
 });
 
+// POST /api/ai/test-alerts - Test Slack and Telegram alerts
+router.post('/test-alerts', async (req, res) => {
+  try {
+    await sendAlert({
+      title: '🔔 Drishti Kavach Test Alert',
+      message: 'This is a test to verify Slack and Telegram alerts are working properly.',
+      severity: 'info'
+    });
+    res.json({ success: true, message: 'Test alerts sent' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to send test alerts', details: err.message });
+  }
+});
+
 // POST /api/ai/settings — Update settings
 router.post('/settings', requireRole('admin'), async (req, res) => {
   try {
@@ -153,3 +168,4 @@ router.post('/settings', requireRole('admin'), async (req, res) => {
 });
 
 module.exports = router;
+
