@@ -110,6 +110,14 @@ export default function Settings() {
             <div className="flex items-center gap-2"><Zap className="w-4 h-4"/> Integrations</div>
           </button>
           <button
+            onClick={() => setActiveTab('guardian')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'guardian' ? 'bg-royal-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+            }`}
+          >
+            <div className="flex items-center gap-2"><Shield className="w-4 h-4"/> AI Guardian</div>
+          </button>
+          <button
             onClick={() => setActiveTab('privacy')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
               activeTab === 'privacy' ? 'bg-royal-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
@@ -238,6 +246,105 @@ export default function Settings() {
               <p className="text-slate-400">Loading integrations...</p>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'guardian' && (
+        <div className="space-y-6">
+          <div className="dk-card border border-slate-700/50 bg-slate-900/50 backdrop-blur-xl">
+            <h3 className="font-semibold text-slate-200 mb-4 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-red-400" /> AI Guardian Configuration
+            </h3>
+            {aiSettings ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-lg bg-slate-800/30 border border-slate-700/30">
+                  <div>
+                    <p className="text-slate-200 font-medium">Guardian Mode</p>
+                    <p className="text-xs text-slate-500 mt-1">AI automatically investigates and blocks threats when you're away</p>
+                  </div>
+                  <button
+                    onClick={() => saveSetting('guardian_mode', { enabled: !aiSettings.guardian_mode?.enabled })}
+                    disabled={saving}
+                    className={`w-14 h-7 rounded-full transition-all relative ${aiSettings.guardian_mode?.enabled ? 'bg-green-500/80' : 'bg-slate-700'}`}
+                  >
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${aiSettings.guardian_mode?.enabled ? 'translate-x-7 shadow-[0_0_10px_rgba(74,222,128,0.8)]' : 'translate-x-1'}`}></span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-lg bg-slate-800/30 border border-slate-700/30">
+                  <div>
+                    <p className="text-slate-200 font-medium">Auto-Investigate</p>
+                    <p className="text-xs text-slate-500 mt-1">AI automatically triages high/critical events</p>
+                  </div>
+                  <button
+                    onClick={() => saveSetting('auto_investigate', { enabled: !aiSettings.auto_investigate?.enabled })}
+                    disabled={saving}
+                    className={`w-14 h-7 rounded-full transition-all relative ${aiSettings.auto_investigate?.enabled ? 'bg-green-500/80' : 'bg-slate-700'}`}
+                  >
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${aiSettings.auto_investigate?.enabled ? 'translate-x-7 shadow-[0_0_10px_rgba(74,222,128,0.8)]' : 'translate-x-1'}`}></span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-lg bg-slate-800/30 border border-slate-700/30">
+                  <div>
+                    <p className="text-slate-200 font-medium">Daily Summary</p>
+                    <p className="text-xs text-slate-500 mt-1">Receive daily security summary at 8:00 AM UTC</p>
+                  </div>
+                  <button
+                    onClick={() => saveSetting('daily_summary_enabled', { enabled: !aiSettings.daily_summary_enabled?.enabled })}
+                    disabled={saving}
+                    className={`w-14 h-7 rounded-full transition-all relative ${aiSettings.daily_summary_enabled?.enabled ? 'bg-green-500/80' : 'bg-slate-700'}`}
+                  >
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${aiSettings.daily_summary_enabled?.enabled ? 'translate-x-7 shadow-[0_0_10px_rgba(74,222,128,0.8)]' : 'translate-x-1'}`}></span>
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-slate-200 font-medium">Auto-Block Threshold</p>
+                      <p className="text-xs text-slate-500 mt-1">IPs with threat score ≥ this value will be auto-blocked</p>
+                    </div>
+                    <input
+                      type="number"
+                      value={aiSettings.auto_block_threshold || 80}
+                      onChange={(e) => saveSetting('auto_block_threshold', parseInt(e.target.value))}
+                      disabled={saving}
+                      className="w-20 bg-slate-700 border border-slate-600 rounded px-3 py-1 text-right text-slate-200"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {[1,2,3,4].map(i => <div key={i} className="animate-pulse h-12 bg-slate-800/50 rounded-lg"></div>)}
+              </div>
+            )}
+          </div>
+
+          <div className="dk-card border border-slate-700/50 bg-slate-900/50">
+            <h3 className="font-semibold text-slate-200 mb-3 flex items-center gap-2">
+              <Eye className="w-5 h-5 text-gold-400" /> Guardian Status
+            </h3>
+            {integrations?.ai_guardian ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {integrations.ai_guardian.map((item, i) => (
+                  <div key={i} className="p-4 rounded-lg bg-slate-800/30 border border-slate-700/30">
+                    <p className="text-sm font-semibold text-slate-200">{item.name}</p>
+                    <p className={`text-xs mt-1 ${['active', 'configured'].includes(item.status) ? 'text-green-400' : 'text-red-400'}`}>
+                      {item.status.toUpperCase()}
+                    </p>
+                    {item.note && <p className="text-xs text-slate-500 mt-2">{item.note}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="animate-spin w-6 h-6 border-2 border-royal-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                <p className="text-slate-500">Loading guardian status...</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
