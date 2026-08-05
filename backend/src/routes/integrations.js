@@ -68,6 +68,13 @@ router.get('/status', async (req, res) => {
       { name: 'Telegram', status: (!!env.TELEGRAM_BOT_TOKEN && !!env.TELEGRAM_CHAT_ID) ? 'configured' : 'not-set', type: 'alert', free: true, url: 'https://t.me/BotFather' },
     ],
 
+    // ── AI Guardian ───────────────────────────────────
+    ai_guardian: [
+      { name: 'AI Guardian Mode', status: (env.GUARDIAN_MODE_ENABLED || 'true') === 'true' ? 'active' : 'disabled', type: 'ai', free: true, note: 'Auto-investigate and auto-block enabled' },
+      { name: 'Auto-Block Threshold', status: 'configured', type: 'ai', free: true, note: `Threat score ≥ ${env.AUTO_BLOCK_THRESHOLD || 80}` },
+      { name: 'Daily Summary', status: 'enabled', type: 'ai', free: true, note: 'Sent at 8:00 AM UTC daily' },
+    ],
+
     // ── Edge / CDN ────────────────────────────────────
     edge: [
       { name: 'Cloudflare', status: (!!env.CLOUDFLARE_API_TOKEN && !!env.CLOUDFLARE_ZONE_ID) ? 'configured' : 'not-set', type: 'edge', free: true, url: 'https://dash.cloudflare.com' },
