@@ -86,6 +86,19 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
         userAgent: req.headers['user-agent']
       }).catch(err => console.error('[LOG FAILED LOGIN]', err));
       
+      // Send Slack/Telegram alert for failed login
+      const alertService = require('../services/alerts');
+      const realIp = getRealIpAddress(req);
+      const location = await fetchIpInfo(realIp);
+      await alertService.sendLoginAlert({
+        title: '⚠️ Failed Login Attempt',
+        message: `Invalid credentials for user: ${email}\nFrom: ${realIp} (${location.city || 'Unknown'}, ${location.country || 'Unknown'})`,
+        severity: 'low',
+        email: email,
+        ip: realIp,
+        location: location
+      });
+      
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -147,6 +160,20 @@ router.post('/login', validate(loginSchema), verifyTurnstile({ optional: true })
     const realIp = getRealIpAddress(req);
     const location = await fetchIpInfo(realIp);
     notifyLogin(user, realIp, location).catch(err => console.error('[LOGIN NOTIFICATION]', err));
+    
+    // Send Slack/Telegram alert for admin logins
+    if (user.role === 'admin' || user.role === 'superadmin') {
+      const alertService = require('../services/alerts');
+      await alertService.sendLoginAlert({
+        title: `🔐 ${user.role.toUpperCase()} Login`,
+        message: `${user.username} (${email}) logged in successfully`,
+        severity: user.role === 'superadmin' ? 'critical' : 'info',
+        username: user.username,
+        email: email,
+        ip: realIp,
+        location: location
+      });
+    }
 
     // Ensure user has notification preferences
     const existingPrefs = await getNotificationPreferences(user.id);
