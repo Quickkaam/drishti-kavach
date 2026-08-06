@@ -114,7 +114,13 @@ async function sendTelegram({ title, message, severity = 'info', websiteId = nul
   }
   
   // Use TELEGRAM_CHAT_ID if set, otherwise use default
-  let chatId = process.env.TELEGRAM_CHAT_ID || '@White_wolf227';
+  let chatId = process.env.TELEGRAM_CHAT_ID;
+  
+  if (!chatId) {
+    console.log('[TELEGRAM] Chat ID not configured, skipping');
+    return;
+  }
+  
   console.log('[TELEGRAM] Chat ID from config:', chatId);
 
   const emoji = SEVERITY_EMOJI[severity] || 'ℹ️';
