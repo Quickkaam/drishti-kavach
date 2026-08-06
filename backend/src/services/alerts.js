@@ -113,8 +113,8 @@ async function sendTelegram({ title, message, severity = 'info', websiteId = nul
     return;
   }
   
-  // Use TELEGRAM_CHAT_ID if set, otherwise use default
-  let chatId = process.env.TELEGRAM_CHAT_ID;
+  // Use TELEGRAM_CHAT_ID from config
+  const chatId = process.env.TELEGRAM_CHAT_ID;
   
   if (!chatId) {
     console.log('[TELEGRAM] Chat ID not configured, skipping');
