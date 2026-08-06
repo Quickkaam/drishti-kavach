@@ -8,9 +8,8 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const axios = require('axios');
-const { createRequire } = require('module');
-const require = createRequire(import.meta.url);
-const fetch = require('node-fetch');
+const https = require('https');
+const http = require('http');
 const supabase = require('../db/supabase');
 const crypto = require('crypto');
 const { logAuthEvent } = require('../services/logging');
@@ -22,6 +21,39 @@ if (!fs.existsSync(logsDir)) {
 }
 
 const logFilePath = path.join(logsDir, 'ip_events.jsonl.gz');
+
+// Simple HTTP fetch using native Node.js http/https modules
+async function nodeFetch(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const isHttps = parsedUrl.protocol === 'https:';
+    const client = isHttps ? https : http;
+
+    const req = client.request(url, {
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      timeout: 10000,
+    }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          json: () => JSON.parse(data),
+          text: () => data,
+        });
+      });
+    });
+
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Request timeout'));
+    });
+    req.end();
+  });
+}
 
 /** Get the real visitor IP address (handles proxy headers) */
 function getRealIpAddress(req) {
@@ -52,9 +84,10 @@ async function fetchIpInfo(ip) {
     const token = process.env.IPINFO_API_KEY;
     // First try ipinfo.io
     if (token) {
-      const ipinfoRes = await fetch(`https://ipinfo.io/${ip}?token=${token}`);
-      if (ipinfoRes.ok) {
-        const data = await ipinfoRes.json();
+      const url = `https://ipinfo.io/${ip}?token=${token}`;
+      const res = await nodeFetch(url);
+      if (res.ok) {
+        const data = await res.json();
         if (data && (data.city || data.country)) {
           return {
             country: data.country || 'Unknown',
@@ -71,7 +104,7 @@ async function fetchIpInfo(ip) {
       }
     }
     // Fallback to ip-api.com (no API key required)
-    const fallbackRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,regionName,city,lat,lon,isp,org,as,proxy`);
+    const fallbackRes = await nodeFetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,regionName,city,lat,lon,isp,org,as,proxy`);
     if (fallbackRes.ok) {
       const alt = await fallbackRes.json();
       if (alt && alt.status === 'success') {
