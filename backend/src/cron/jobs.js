@@ -11,6 +11,13 @@ const { checkTrafficSpike, checkIpFlood } = require('../services/ddos');
 const { cleanupOldLogs } = require('../services/logging');
 const { sendAlert } = require('../services/alerts');
 
+// Initialize Socket.io for real-time alerts
+let io = null;
+
+function initializeSocket(ioInstance) {
+  io = ioInstance;
+}
+
 function startCronJobs() {
   console.log('[CRON] Starting scheduled jobs...');
 
@@ -141,7 +148,84 @@ function startCronJobs() {
     }
   });
 
+  // Every minute: Voice alert monitor (reads critical events and adds to queue)
+  cron.schedule('* * * * *', async () => {
+    try {
+      // Get the last minute's critical/security events
+      const since1min = new Date(Date.now() - 60 * 1000).toISOString();
+      
+      const { data: newEvents } = await supabase
+        .from('security_events')
+        .select('id, website_id, severity, event_type, description, created_at')
+        .gte('created_at', since1min)
+        .neq('severity', 'info')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (newEvents && newEvents.length > 0) {
+        // For each new event, add to voice_alerts queue if not already present
+        for (const event of newEvents) {
+          // Check if alert already exists
+          const { data: existing } = await supabase
+            .from('voice_alerts')
+            .select('id')
+            .eq('website_id', event.website_id)
+            .eq('event_id', event.id)
+            .single();
+
+          if (!existing) {
+            // Add to voice_alerts queue
+            await supabase.insert('voice_alerts', {
+              website_id: event.website_id,
+              event_id: event.id,
+              alert_type: event.event_type,
+              severity: event.severity,
+              title: `${event.event_type} detected`,
+              message: event.description || `New ${event.severity} severity ${event.event_type} event`,
+              read: false
+            });
+
+            // Emit real-time event to WebSocket clients
+            if (io) {
+              io.to(`website:${event.website_id}`).emit('new_voice_alert', event);
+            }
+          }
+        }
+      }
+
+      // Read queued alerts and speak them (if auto_read_alerts is enabled)
+      const { data: unreadAlerts } = await supabase
+        .from('voice_alerts')
+        .select('id, website_id, severity, message')
+        .eq('read', false)
+        .order('created_at', { ascending: true })
+        .limit(5);
+
+      if (unreadAlerts && unreadAlerts.length > 0) {
+        for (const alert of unreadAlerts) {
+          // Mark as read
+          await supabase
+            .from('voice_alerts')
+            .update({ read: true, read_at: new Date().toISOString() })
+            .eq('id', alert.id);
+
+          // Read alert aloud via WebSocket (simulated)
+          if (io) {
+            io.to(`website:${alert.website_id}`).emit('read_voice_alert', {
+              alert_id: alert.id,
+              message: alert.message,
+              severity: alert.severity
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[CRON VOICE ALERTS]', err.message);
+    }
+  });
+
   console.log('[CRON] All jobs scheduled ✓');
 }
 
-module.exports = { startCronJobs };
+module.exports = { startCronJobs, initializeSocket };
+

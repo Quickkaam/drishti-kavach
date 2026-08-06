@@ -43,6 +43,7 @@ const integrationsRoutes = require('./routes/integrations');
 const analyticsRoutes = require('./routes/analytics');
 const mitreRoutes = require('./routes/mitre');
 const notificationRoutes = require('./routes/notifications');
+const sentinelRoutes = require('./routes/sentinel');
 
 const app = express();
 const server = http.createServer(app);
@@ -183,6 +184,8 @@ app.use('/api/integrations', integrationsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/mitre', mitreRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/sentinel', sentinelRoutes);
+app.use('/admin', sentinelRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────
 app.use((_req, res) => {
@@ -212,6 +215,10 @@ server.listen(PORT, () => {
   console.log(`   दृष्टिः रक्षति, रक्षा दृश्यते`);
   console.log(`   "Vision protects, and protection is seen."\n`);
   startCronJobs();
+  
+  // Initialize Socket.io with cron jobs for voice alerts
+  const { initializeSocket } = require('./cron/jobs');
+  initializeSocket(io);
 });
 
 module.exports = { app, server, io };

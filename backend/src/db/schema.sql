@@ -541,3 +541,146 @@ INSERT INTO assistant_settings (setting_key, setting_value) VALUES
     "geo_spike_threshold": 70
   }')
 ON CONFLICT (setting_key) DO NOTHING;
+
+-- ============================================
+-- DRISHTI SENTINEL - NEW TABLES
+-- Voice Assistant + Service Provisioning
+-- ============================================
+
+-- ─── 26. SERVICE CATALOG ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS service_catalog (
+  id BIGSERIAL PRIMARY KEY,
+  service_id VARCHAR(50) UNIQUE NOT NULL,
+  display_name VARCHAR(100) NOT NULL,
+  description TEXT,
+  category VARCHAR(50),
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Seed the 15 services
+INSERT INTO service_catalog (service_id, display_name, description, category, is_default) VALUES
+  ('core_monitoring', 'Core Monitoring', 'Website activity logging and form tracking', 'core', TRUE),
+  ('ddos_protection', 'DDoS Protection', 'Real-time attack detection and Cloudflare mitigation', 'security', TRUE),
+  ('ai_assistant', 'Drishti AI Chat', 'Text-based AI assistant with threat analysis', 'ai', TRUE),
+  ('voice_assistant', 'Drishti Sentinel (Voice)', 'Voice commands and alert reading', 'premium', FALSE),
+  ('dark_web_monitoring', 'Dark Web Monitoring', 'Breach and credential monitoring (HIBP + Telegram)', 'premium', FALSE),
+  ('attack_surface', 'Attack Surface Monitoring', 'Subdomain, port, SSL certificate discovery', 'premium', FALSE),
+  ('vulnerability_scanner', 'Vulnerability Scanner', 'Weekly CVE scanning and remediation suggestions', 'security', FALSE),
+  ('compliance_pack', 'Compliance Pack', 'CERT-In, DPDP, GDPR automated reports', 'compliance', FALSE),
+  ('white_label', 'White-Label', 'Remove Drishti branding from dashboard', 'premium', FALSE),
+  ('client_portal', 'Client Portal', 'Separate login for end-clients (reseller mode)', 'premium', FALSE),
+  ('soar_runbooks', 'SOAR Automation', 'Custom rule engines and auto-remediation', 'premium', FALSE),
+  ('phishing_simulation', 'Phishing Simulation', 'Employee training campaigns', 'security', FALSE),
+  ('mobile_app', 'Mobile App', 'iOS/Android app access', 'premium', FALSE),
+  ('api_access', 'Full API Access', 'API tokens for external integration', 'premium', FALSE),
+  ('sla_support', 'Priority Support', '8x5 or 24x7 support access', 'support', FALSE)
+ON CONFLICT (service_id) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_service_catalog_service_id ON service_catalog(service_id);
+CREATE INDEX IF NOT EXISTS idx_service_catalog_category ON service_catalog(category);
+
+-- ─── 27. CLIENT SERVICES ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS client_services (
+  id BIGSERIAL PRIMARY KEY,
+  website_id BIGINT REFERENCES websites(id) ON DELETE CASCADE,
+  service_id VARCHAR(50) REFERENCES service_catalog(service_id) ON DELETE CASCADE,
+  enabled BOOLEAN DEFAULT FALSE,
+  enabled_by VARCHAR(100),
+  enabled_at TIMESTAMP DEFAULT NOW(),
+  disabled_by VARCHAR(100),
+  disabled_at TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(website_id, service_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_services_website ON client_services(website_id);
+CREATE INDEX IF NOT EXISTS idx_client_services_service ON client_services(service_id);
+CREATE INDEX IF NOT EXISTS idx_client_services_enabled ON client_services(enabled);
+
+-- ─── 28. VOICE SETTINGS ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS voice_settings (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  website_id BIGINT REFERENCES websites(id) ON DELETE CASCADE,
+  wake_word VARCHAR(50) DEFAULT 'Drishti',
+  voice_gender VARCHAR(20) DEFAULT 'female',
+  voice_language VARCHAR(10) DEFAULT 'en-IN',
+  speech_rate DECIMAL(3,2) DEFAULT 1.0,
+  speech_pitch DECIMAL(3,2) DEFAULT 1.0,
+  auto_read_alerts BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, website_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_voice_settings_user ON voice_settings(user_id);
+CREATE INDEX IF NOT EXISTS idx_voice_settings_website ON voice_settings(website_id);
+
+-- ─── 29. VOICE SESSIONS ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS voice_sessions (
+  id BIGSERIAL PRIMARY KEY,
+  session_id UUID DEFAULT gen_random_uuid(),
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  website_id BIGINT REFERENCES websites(id) ON DELETE CASCADE,
+  transcript TEXT,
+  ai_response TEXT,
+  command_executed VARCHAR(100),
+  command_result JSONB,
+  duration_seconds INTEGER,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_voice_sessions_user ON voice_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_voice_sessions_website ON voice_sessions(website_id);
+CREATE INDEX IF NOT EXISTS idx_voice_sessions_created ON voice_sessions(created_at);
+
+-- ─── 30. VOICE ALERTS ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS voice_alerts (
+  id BIGSERIAL PRIMARY KEY,
+  website_id BIGINT REFERENCES websites(id) ON DELETE CASCADE,
+  event_id BIGINT,
+  alert_type VARCHAR(50),
+  severity VARCHAR(20),
+  title TEXT,
+  message TEXT,
+  read BOOLEAN DEFAULT FALSE,
+  read_at TIMESTAMP,
+  read_by VARCHAR(100),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_voice_alerts_website ON voice_alerts(website_id);
+CREATE INDEX IF NOT EXISTS idx_voice_alerts_severity ON voice_alerts(severity);
+CREATE INDEX IF NOT EXISTS idx_voice_alerts_created ON voice_alerts(created_at);
+CREATE INDEX IF NOT EXISTS idx_voice_alerts_read ON voice_alerts(read);
+
+-- ─── 31. ADMIN SETTINGS ───────────────────────────────────────
+-- Extension of assistant_settings for Sentinel features
+INSERT INTO assistant_settings (setting_key, setting_value) VALUES
+  ('sentinel_enabled', '{"enabled": true, "voice_enabled": true, "service_control": true}'),
+  ('client_service_defaults', '{"core_monitoring": true, "ddos_protection": true, "ai_assistant": true}')
+ON CONFLICT (setting_key) DO NOTHING;
+-- ─── DEFAULT CLIENT SERVICES (Starter Pack for new clients) ────
+-- Insert default services for all existing websites (starter pack)
+INSERT INTO client_services (website_id, service_id, enabled, enabled_by, enabled_at)
+SELECT w.id, 'core_monitoring', true, 'system', NOW()
+FROM websites w
+WHERE NOT EXISTS (
+  SELECT 1 FROM client_services cs WHERE cs.website_id = w.id AND cs.service_id = 'core_monitoring'
+);
+
+INSERT INTO client_services (website_id, service_id, enabled, enabled_by, enabled_at)
+SELECT w.id, 'ddos_protection', true, 'system', NOW()
+FROM websites w
+WHERE NOT EXISTS (
+  SELECT 1 FROM client_services cs WHERE cs.website_id = w.id AND cs.service_id = 'ddos_protection'
+);
+
+INSERT INTO client_services (website_id, service_id, enabled, enabled_by, enabled_at)
+SELECT w.id, 'ai_assistant', true, 'system', NOW()
+FROM websites w
+WHERE NOT EXISTS (
+  SELECT 1 FROM client_services cs WHERE cs.website_id = w.id AND cs.service_id = 'ai_assistant'
+);

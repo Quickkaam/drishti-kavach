@@ -9,8 +9,9 @@ import { useAuth } from '../../context/AuthContext';
 import MobileNavigation from './MobileNavigation';
 import { useTheme, ThemeToggleButton, ThemeStatus } from '../ui/ThemeToggle';
 import NotificationBell from '../ui/NotificationBell';
-import { Database, Bot, Cloud, Activity, LogOut } from 'lucide-react';
+import { Database, Bot, Cloud, Activity, LogOut, Shield } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
+import VoiceAssistant from '../ui/VoiceAssistant';
 
 const NAV = [
   { path: '/',            icon: '◈', label: 'OVERVIEW',        end: true },
@@ -30,6 +31,7 @@ const NAV = [
   { path: '/audit',      icon: '≡', label: 'AUDIT LOG',   adminOnly: true },
   { path: '/notifications', icon: '🔔', label: 'NOTIFICATIONS' },
   { path: '/settings',   icon: '⚙', label: 'SETTINGS' },
+  { path: '/sentinel',   icon: <Shield size={16} />, label: 'SENTINEL',   superAdminOnly: true, badge: 'NEW' },
 ];
 
 const THREAT_CONFIG = {
@@ -656,6 +658,9 @@ export default function DashboardLayout() {
           }
         `}
       </style>
+      
+      {/* Voice Assistant Widget */}
+      <VoiceAssistant />
     </div>
   );
 }

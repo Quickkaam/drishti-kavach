@@ -115,11 +115,7 @@ async function sendTelegram({ title, message, severity = 'info', websiteId = nul
   
   // Use TELEGRAM_CHAT_ID if set, otherwise use default
   let chatId = process.env.TELEGRAM_CHAT_ID || '@White_wolf227';
-  // Remove @ prefix if present (Telegram API accepts both @username and numeric IDs)
-  if (chatId.startsWith('@')) {
-    chatId = chatId.substring(1);
-  }
-  console.log('[TELEGRAM] Chat ID:', chatId);
+  console.log('[TELEGRAM] Chat ID from config:', chatId);
 
   const emoji = SEVERITY_EMOJI[severity] || 'ℹ️';
   const timestamp = new Date().toLocaleString('en-IN', { 
@@ -390,18 +386,6 @@ async function sendLoginAlert({
   return sendAlert({ title, message, severity, websiteId, attachments });
 }
 
-module.exports = {
-  sendAlert,
-  sendSlack,
-  sendTelegram,
-  sendCriticalAlert,
-  sendSecurityAlert,
-  sendDdosAlert,
-  sendFormAlert,
-  sendLoginAlert,
-  SEVERITY_EMOJI,
-  SEVERITY_COLOR
-};
 /**
  * Test alert to verify Slack and Telegram are working
  */

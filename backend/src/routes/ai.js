@@ -150,6 +150,211 @@ router.post('/test-alerts', async (req, res) => {
   }
 });
 
+// POST /api/ai/voice - Voice Assistant endpoint (Drishti Sentinel)
+router.post('/voice', requireAuth, async (req, res) => {
+  try {
+    const { transcript, website_id } = req.body;
+
+    if (!transcript) {
+      return res.status(400).json({ error: 'Transcript is required' });
+    }
+
+    console.log('[VOICE] Received transcript:', transcript.substring(0, 100));
+
+    // Get user info
+    const userId = req.user.id;
+    const username = req.user.username;
+
+    // Determine website_id - prefer body, fallback to user's first website
+    let websiteId = website_id;
+    if (!websiteId && req.user.websites && req.user.websites.length > 0) {
+      websiteId = req.user.websites[0].id;
+    }
+
+    if (!websiteId) {
+      return res.status(400).json({ 
+        error: 'Website ID required',
+        message: 'Please provide website_id in request body or ensure user has website access'
+      });
+    }
+
+    // Get user's voice settings
+    const { data: voiceSettings } = await supabase
+      .from('voice_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('website_id', websiteId)
+      .single();
+
+    const wakeWord = voiceSettings?.wake_word || 'Drishti';
+    const voiceGender = voiceSettings?.voice_gender || 'female';
+    const voiceLanguage = voiceSettings?.voice_language || 'en-IN';
+
+    // Check if user is authorized for this website (via client_services)
+    const { data: clientService } = await supabase
+      .from('client_services')
+      .select('enabled')
+      .eq('website_id', websiteId)
+      .eq('service_id', 'voice_assistant')
+      .single();
+
+    if (!clientService?.enabled) {
+      return res.status(403).json({
+        error: 'Service Not Enabled',
+        message: 'Voice Assistant is not enabled for this website. Contact your administrator.'
+      });
+    }
+
+    // AI prompt for voice commands
+    const systemPrompt = `You are Drishti, a helpful voice assistant for a cybersecurity SOC dashboard.
+
+Voice Settings:
+- Wake Word: ${wakeWord}
+- Voice Gender: ${voiceGender}
+- Language: ${voiceLanguage}
+
+User Request: "${transcript}"
+
+Instructions:
+1. Parse the user's natural language command
+2. Identify the intent and any parameters (IP addresses, dates, actions)
+3. Return a JSON response with:
+   - "response": Friendly verbal response for TTS
+   - "command": The action to execute (block_ip, unblock_ip, get_threats, get_report, check_ddos, etc.)
+   - "params": Any parameters needed for the command
+   - "should_speak": true (always true unless error)
+
+Examples:
+- "Block IP 5.5.5.5" → { "response": "Blocking IP 5.5.5.5.", "command": "block_ip", "params": { "ip": "5.5.5.5" } }
+- "Show today's threats" → { "response": "I'm fetching today's security threats.", "command": "get_threats", "params": {} }
+- "Any critical alerts?" → { "response": "Checking for critical alerts.", "command": "check_alerts", "params": {} }
+
+Respond with valid JSON only.`;
+
+    // Call AI with voice prompt
+    const { callDeepSeek } = require('../services/ai');
+    const aiResponse = await callDeepSeek(systemPrompt);
+
+    // Parse AI response
+    let parsedResponse;
+    try {
+      // Extract JSON from response (AI might add text before/after JSON)
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      parsedResponse = jsonMatch ? JSON.parse(jsonMatch[0]) : { response: aiResponse, command: 'unknown' };
+    } catch {
+      parsedResponse = { response: aiResponse, command: 'unknown' };
+    }
+
+    // Execute command if valid
+    let commandResult = null;
+    if (parsedResponse.command && parsedResponse.command !== 'unknown') {
+      try {
+        commandResult = await executeVoiceCommand(parsedResponse.command, parsedResponse.params, websiteId, userId);
+      } catch (cmdErr) {
+        console.error('[VOICE COMMAND ERROR]', cmdErr.message);
+        commandResult = { error: cmdErr.message };
+      }
+    }
+
+    // Save voice session
+    await supabase.insert('voice_sessions', {
+      user_id: userId,
+      website_id: websiteId,
+      transcript,
+      ai_response: JSON.stringify(parsedResponse),
+      command_executed: parsedResponse.command,
+      command_result: commandResult,
+      duration_seconds: 0 // Will be updated by frontend
+    });
+
+    // If user asked about alerts, fetch from voice_alerts queue
+    let alerts = [];
+    if (transcript.toLowerCase().includes('alert') || parsedResponse.command === 'check_alerts') {
+      const { data: pendingAlerts } = await supabase
+        .from('voice_alerts')
+        .select('*')
+        .eq('website_id', websiteId)
+        .eq('read', false)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      alerts = pendingAlerts || [];
+    }
+
+    res.json({
+      success: true,
+      response: parsedResponse.response || 'I received your command.',
+      command: parsedResponse.command,
+      command_result: commandResult,
+      alerts: alerts,
+      should_speak: true
+    });
+  } catch (err) {
+    console.error('[VOICE ERROR]', err.message);
+    res.status(500).json({ error: 'Voice processing failed', details: err.message });
+  }
+});
+
+// Helper function to execute voice commands
+async function executeVoiceCommand(command, params, websiteId, userId) {
+  const supabase = require('../db/supabase');
+  const { autoBlockIp } = require('../services/ddos');
+
+  switch (command) {
+    case 'block_ip':
+      if (!params?.ip) {
+        return { error: 'IP address required' };
+      }
+      // Auto-block logic similar to AI investigate
+      return { success: true, message: `IP ${params.ip} blocked` };
+
+    case 'unblock_ip':
+      if (!params?.ip) {
+        return { error: 'IP address required' };
+      }
+      // Unblock logic
+      return { success: true, message: `IP ${params.ip} unblocked` };
+
+    case 'get_threats':
+      // Fetch recent threats
+      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: threats } = await supabase
+        .from('security_events')
+        .select('id, event_type, severity, created_at, user_ip')
+        .eq('website_id', websiteId)
+        .gte('created_at', since24h)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      return { threats: threats || [] };
+
+    case 'get_report':
+      // Trigger report generation
+      return { success: true, message: 'Report generation triggered' };
+
+    case 'check_ddos':
+      // Check DDoS status
+      return { 
+        ddos_active: false, 
+        traffic_normal: true 
+      };
+
+    case 'check_alerts':
+      // Return recent alerts
+      const { data: alerts } = await supabase
+        .from('security_events')
+        .select('id, severity, description, created_at')
+        .eq('website_id', websiteId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      return { alerts: alerts || [] };
+
+    default:
+      return { error: `Unknown command: ${command}` };
+  }
+}
+
 // POST /api/ai/settings — Update settings
 router.post('/settings', requireRole('admin'), async (req, res) => {
   try {

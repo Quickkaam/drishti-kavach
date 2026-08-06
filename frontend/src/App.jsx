@@ -32,6 +32,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
 import Analytics from './pages/Analytics';
 import MitreMatrix from './pages/MitreMatrix';
+import SentinelAdmin from './pages/SentinelAdmin';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -88,6 +89,7 @@ export default function App() {
                 <Route path="settings" element={lazyLoad(Settings)} />
                 <Route path="analytics" element={lazyLoad(Analytics)} />
                 <Route path="mitre" element={lazyLoad(MitreMatrix)} />
+                <Route path="sentinel" element={<ProtectedRoute roles={['superadmin', 'admin']}><SentinelAdmin /></ProtectedRoute>} />
               </Route>
               
               {/* Catch-all route for 404 */}
