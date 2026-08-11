@@ -148,7 +148,9 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
 
       if (data.response) {
         setResponse(data.response);
-        if (!isMuted && data.should_speak) {
+        // Always speak response unless explicitly disabled
+        const shouldSpeak = data.should_speak !== false && !isMuted;
+        if (shouldSpeak) {
           speakResponse(data.response);
         }
       }
