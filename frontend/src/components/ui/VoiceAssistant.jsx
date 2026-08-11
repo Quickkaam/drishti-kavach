@@ -3,7 +3,7 @@
 // Floating microphone button with push-to-talk
 // ============================================
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, MicOff, X, Loader, Send, Volume2, VolumeX } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -20,51 +20,70 @@ export default function VoiceAssistant() {
 
   const recognitionRef = useRef(null);
   const speechSynthesisRef = useRef(window.speechSynthesis);
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
 
   // Initialize Speech Recognition (Browser native)
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.lang = 'en-IN';
-      recognitionRef.current.interimResults = true;
+      const recognition = new SpeechRecognition();
+      
+      recognition.continuous = false;
+      recognition.lang = 'en-IN';
+      recognition.interimResults = true;
 
-      recognitionRef.current.onresult = (event) => {
+      recognition.onstart = () => {
+        setIsListening(true);
+        setError(null);
+      };
+
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
         let interimTranscript = '';
+
         for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcriptPart = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            setTranscript(event.results[i][0].transcript);
+            finalTranscript += transcriptPart;
           } else {
-            interimTranscript += event.results[i][0].transcript;
+            interimTranscript += transcriptPart;
           }
         }
+
+        // Show interim results as user speaks
         if (interimTranscript) {
-          // Show interim results as user speaks
           setTranscript(prev => prev + ' ' + interimTranscript);
+        }
+        
+        // Process final transcript
+        if (finalTranscript) {
+          setTranscript(finalTranscript);
+          processTranscript(finalTranscript);
         }
       };
 
-      recognitionRef.current.onerror = (event) => {
+      recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
-        setError(`Speech recognition error: ${event.error}`);
+        setError(`Error: ${event.error}`);
         setIsListening(false);
         setIsLoading(false);
       };
 
-      recognitionRef.current.onend = () => {
+      recognition.onend = () => {
         setIsListening(false);
+        // Don't auto-process here - let user confirm by clicking send
         if (transcript.trim()) {
-          processTranscript();
+          // transcript already set in onresult
         }
       };
+
+      recognitionRef.current = recognition;
+    } else {
+      setError('Speech recognition not supported. Please use Chrome, Edge, or Safari.');
     }
   }, [transcript]);
 
-  // Speak response
-  const speakResponse = (text) => {
+  // Speak response with female voice
+  const speakResponse = useCallback((text) => {
     if (isMuted || !speechSynthesisRef.current) return;
 
     // Cancel any ongoing speech
@@ -77,14 +96,18 @@ export default function VoiceAssistant() {
 
     // Try to find a female voice
     const voices = speechSynthesisRef.current.getVoices();
+    console.log('Available voices:', voices.map(v => v.name));
+    
     const femaleVoice = voices.find(v => 
       v.name.toLowerCase().includes('female') || 
       v.name.toLowerCase().includes('google us english') ||
-      v.name.toLowerCase().includes('samantha')
+      v.name.toLowerCase().includes('samantha') ||
+      v.name.toLowerCase().includes('google uk english female')
     );
     
     if (femaleVoice) {
       utterance.voice = femaleVoice;
+      console.log('Using voice:', femaleVoice.name);
     }
 
     utterance.onstart = () => setIsSpeaking(true);
@@ -92,26 +115,10 @@ export default function VoiceAssistant() {
     utterance.onerror = () => setIsSpeaking(false);
 
     speechSynthesisRef.current.speak(utterance);
-  };
+  }, [isMuted]);
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      setError('Speech recognition not supported in this browser. Please use Chrome, Edge, or Safari.');
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-    } else {
-      setTranscript('');
-      setError(null);
-      recognitionRef.current.start();
-      setIsListening(true);
-    }
-  };
-
-  const processTranscript = async () => {
-    if (!transcript.trim()) return;
+  const processTranscript = async (text = transcript) => {
+    if (!text.trim()) return;
 
     setIsLoading(true);
     setError(null);
@@ -120,10 +127,14 @@ export default function VoiceAssistant() {
       const user = JSON.parse(localStorage.getItem('dk_user'));
       const websiteId = user.websites?.[0]?.id;
 
+      console.log('Sending to voice API:', text);
+      
       const { data } = await api.post('/ai/voice', {
-        transcript,
+        transcript: text,
         website_id: websiteId
       });
+
+      console.log('Voice API response:', data);
 
       if (data.response) {
         setResponse(data.response);
@@ -140,7 +151,7 @@ export default function VoiceAssistant() {
         console.log('New alerts:', data.alerts);
         // Play alert sound
         if (!isMuted) {
-          speakResponse(`You have ${data.alerts.length} new ${data.alerts[0].severity} alerts.`);
+          speakResponse(`You have ${data.alerts.length} new alerts.`);
         }
       }
     } catch (err) {
@@ -153,6 +164,27 @@ export default function VoiceAssistant() {
     }
   };
 
+  const toggleListening = useCallback(() => {
+    if (!recognitionRef.current) {
+      setError('Speech recognition not supported.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      setTranscript('');
+      setError(null);
+      try {
+        recognitionRef.current.start();
+        console.log('Listening started...');
+      } catch (err) {
+        console.error('Failed to start listening:', err);
+        setError('Failed to start microphone. Please check permissions.');
+      }
+    }
+  }, [isListening]);
+
   const toggleMute = () => {
     setIsMuted(!isMuted);
     if (!isMuted) {
@@ -160,15 +192,21 @@ export default function VoiceAssistant() {
     }
   };
 
+  const handleSubmit = () => {
+    if (transcript.trim()) {
+      processTranscript(transcript);
+    }
+  };
+
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    return null; // Don't show widget if speech recognition not supported
+    return null;
   }
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {/* Voice Assistant Widget */}
       {isOpen && (
-        <div className="absolute bottom-20 right-0 w-96 bg-slate-800/95 backdrop-blur-xl border border-slate-600 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="absolute bottom-20 right-0 w-96 bg-slate-800/95 backdrop-blur-xl border border-slate-600 rounded-2xl shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-900/50">
             <div className="flex items-center gap-2">
@@ -181,9 +219,9 @@ export default function VoiceAssistant() {
           </div>
 
           {/* Transcript Area */}
-          <div className="p-4 bg-slate-900/30 min-h-[80px]">
+          <div className="p-4 bg-slate-900/30 min-h-[80px] max-h-[150px] overflow-y-auto">
             {transcript ? (
-              <p className="text-white text-sm">{transcript}</p>
+              <p className="text-white text-sm whitespace-pre-wrap">{transcript}</p>
             ) : isLoading ? (
               <div className="flex items-center gap-2 text-slate-400 text-sm">
                 <Loader className="w-4 h-4 animate-spin" />
@@ -236,6 +274,7 @@ export default function VoiceAssistant() {
                   ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
                   : 'bg-royal-600 hover:bg-royal-500 shadow-lg shadow-royal-900/50'
               }`}
+              title="Hold to speak"
             >
               {isLoading ? (
                 <Loader className="w-6 h-6 text-white animate-spin" />
@@ -245,7 +284,14 @@ export default function VoiceAssistant() {
                 <Mic className="w-6 h-6 text-white" />
               )}
             </button>
-            <div className="w-8"></div> {/* Spacer */}
+            <button
+              onClick={handleSubmit}
+              disabled={!transcript.trim() || isLoading}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Send to AI"
+            >
+              <Send className="w-5 h-5" />
+            </button>
           </div>
         </div>
       )}
@@ -256,6 +302,7 @@ export default function VoiceAssistant() {
         className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all hover:scale-110 ${
           isOpen ? 'bg-slate-700' : 'bg-royal-600 hover:bg-royal-500'
         }`}
+        title="Open Voice Assistant"
       >
         {isOpen ? (
           <X className="w-7 h-7 text-white" />
