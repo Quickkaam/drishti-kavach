@@ -172,7 +172,50 @@ export default function DrishtiAI() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = async (text) => {
+  const speakResponse = useCallback((text) => {
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    // Extract plain text if it's JSON
+    let textToSpeak = text;
+    try {
+      if (text.trim().startsWith('```') || text.includes('```')) {
+        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[1].trim());
+          textToSpeak = parsed.message || parsed.response || text;
+        }
+      } else {
+        const parsed = JSON.parse(text);
+        textToSpeak = parsed.message || parsed.response || text;
+      }
+    } catch (e) {
+      // It's plain text, keep it as is
+    }
+
+    // Ensure voices are loaded
+    const voices = window.speechSynthesis.getVoices();
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = 'en-IN';
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
+
+    const femaleVoiceNames = ['zira', 'susan', 'hazel', 'alice', 'anna', 'karen', 'natalia', 'martha', 'sarah', 'heera', 'rekha'];
+    let selectedVoice = voices.find(v => 
+      femaleVoiceNames.some(name => v.name.toLowerCase().includes(name)) || 
+      v.name.toLowerCase().includes('female')
+    );
+
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    } else if (voices.length > 0) {
+      utterance.voice = voices[0];
+    }
+    
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
+  const sendMessage = async (text, isVoice = false) => {
     const question = text || input.trim();
     if (!question) return;
 
@@ -187,11 +230,19 @@ export default function DrishtiAI() {
         session_id: sessionId,
         provider: selectedProvider,
       });
+      
+      const responseText = data.response || 'I encountered an issue. Please try again.';
+      
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: data.response || 'I encountered an issue. Please try again.',
+        content: responseText,
         time: new Date().toLocaleTimeString(),
       }]);
+      
+      // Speak the response if the input was via voice
+      if (isVoice) {
+        speakResponse(responseText);
+      }
     } catch (error) {
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error';
       console.error('[AI Error]', errorMessage);
@@ -332,7 +383,7 @@ export default function DrishtiAI() {
       />
       
       {/* Voice Assistant Widget */}
-      <VoiceAssistant isOpen={isVoiceOpen} setIsOpen={setIsVoiceOpen} setInput={setInput} />
+      <VoiceAssistant isOpen={isVoiceOpen} setIsOpen={setIsVoiceOpen} setInput={setInput} onSubmit={(text) => sendMessage(text, true)} />
 
       {/* Custom scrollbar styles */}
       <style>{`

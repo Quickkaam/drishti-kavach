@@ -8,7 +8,7 @@ import { Mic, MicOff, X, Loader, Send, Volume2, VolumeX } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
-export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
+export default function VoiceAssistant({ isOpen, setIsOpen, setInput, onSubmit }) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
@@ -73,9 +73,10 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
         }
         
         // Process final transcript
-        if (finalTranscript && setInput) {
-          setInput(finalTranscript);
-          if (setIsOpen) setIsOpen(false);
+        if (finalTranscript) {
+          if (setInput) setInput(finalTranscript);
+          if (onSubmit) onSubmit(finalTranscript);
+          if (setIsOpen && setInput) setIsOpen(false); // Only close if it was acting as dictation
         }
       };
 
