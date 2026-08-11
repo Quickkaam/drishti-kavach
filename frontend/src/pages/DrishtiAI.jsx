@@ -2,10 +2,12 @@
 // Drishti Kavach — Drishti AI Chat Page
 // ============================================
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import api from '../api/client';
 import logo from '/drishti-ai-logo.png';
+import { Mic } from 'lucide-react';
+import VoiceAssistant from '../components/ui/VoiceAssistant';
 
 const QUICK_PROMPTS = [
   "Show me today's threats",
@@ -163,6 +165,7 @@ export default function DrishtiAI() {
   const [loading, setLoading] = useState(false);
   const [sessionId] = useState(uuidv4());
   const [selectedProvider, setSelectedProvider] = useState('groq');
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -294,13 +297,23 @@ export default function DrishtiAI() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && !loading && sendMessage()}
-            placeholder="Ask Drishti AI about security threats, analysis, or recommendations..."
+            placeholder="Ask Drishti AI about security threats, analysis, or recommendations... (or speak using the microphone)"
             className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl text-black placeholder-gray-500 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20 transition-all duration-200 text-sm"
             style={{ fontFamily: "'Inter', sans-serif" }}
             disabled={loading}
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-            Press Enter to send
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-3">
+            <button
+              onClick={() => document.getElementById('voice-assistant-btn')?.click()}
+              disabled={loading}
+              className="text-gray-400 hover:text-royal-500 transition-colors p-1.5 rounded-lg hover:bg-royal-500/10"
+              title="Use Voice Assistant"
+            >
+              <Mic className="w-5 h-5" />
+            </button>
+            <div className="text-gray-400 text-xs">
+              Press Enter to send
+            </div>
           </div>
         </div>
         <button 
@@ -313,6 +326,16 @@ export default function DrishtiAI() {
         </button>
       </div>
       
+      {/* Hidden Voice Assistant Button (triggers the widget) */}
+      <button 
+        id="voice-assistant-btn" 
+        className="hidden" 
+        onClick={() => setIsVoiceOpen(true)}
+      />
+      
+      {/* Voice Assistant Widget */}
+      <VoiceAssistant isOpen={isVoiceOpen} setIsOpen={setIsVoiceOpen} setInput={setInput} />
+
       {/* Custom scrollbar styles */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {

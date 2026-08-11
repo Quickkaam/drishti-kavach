@@ -8,11 +8,9 @@ import { Mic, MicOff, X, Loader, Send, Volume2, VolumeX } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
-export default function VoiceAssistant() {
-  const [isOpen, setIsOpen] = useState(false);
+export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [response, setResponse] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -55,9 +53,9 @@ export default function VoiceAssistant() {
         }
         
         // Process final transcript
-        if (finalTranscript) {
-          setTranscript(finalTranscript);
-          processTranscript(finalTranscript);
+        if (finalTranscript && setInput) {
+          setInput(finalTranscript);
+          if (setIsOpen) setIsOpen(false);
         }
       };
 
@@ -203,7 +201,7 @@ export default function VoiceAssistant() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className={`fixed bottom-6 right-6 z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
       {/* Voice Assistant Widget */}
       {isOpen && (
         <div className="absolute bottom-20 right-0 w-96 bg-slate-800/95 backdrop-blur-xl border border-slate-600 rounded-2xl shadow-2xl overflow-hidden">
