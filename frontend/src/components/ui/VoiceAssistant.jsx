@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [response, setResponse] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
