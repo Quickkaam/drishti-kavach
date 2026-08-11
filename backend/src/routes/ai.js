@@ -236,13 +236,15 @@ Respond with valid JSON only.`;
     const aiResponse = await callDeepSeek(systemPrompt);
 
     // Parse AI response
-    let parsedResponse;
+    let parsedResponse = { response: aiResponse, command: 'unknown' };
     try {
       // Extract JSON from response (AI might add text before/after JSON)
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-      parsedResponse = jsonMatch ? JSON.parse(jsonMatch[0]) : { response: aiResponse, command: 'unknown' };
-    } catch {
-      parsedResponse = { response: aiResponse, command: 'unknown' };
+      if (jsonMatch) {
+        parsedResponse = JSON.parse(jsonMatch[0]);
+      }
+    } catch (parseErr) {
+      console.error('[VOICE PARSE ERROR]', parseErr.message);
     }
 
     // Execute command if valid
@@ -283,8 +285,8 @@ Respond with valid JSON only.`;
 
     res.json({
       success: true,
-      response: parsedResponse.response || 'I received your command.',
-      command: parsedResponse.command,
+      response: (parsedResponse && parsedResponse.response) || 'I received your command.',
+      command: parsedResponse?.command || 'unknown',
       command_result: commandResult,
       alerts: alerts,
       should_speak: true
