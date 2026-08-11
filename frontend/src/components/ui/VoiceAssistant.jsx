@@ -16,6 +16,7 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [speakingProgress, setSpeakingProgress] = useState(0);
 
   const recognitionRef = useRef(null);
   const speechSynthesisRef = useRef(window.speechSynthesis);
@@ -69,9 +70,9 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
 
       recognition.onend = () => {
         setIsListening(false);
-        // Don't auto-process here - let user confirm by clicking send
         if (transcript.trim()) {
-          // transcript already set in onresult
+          // Auto-process if transcript exists
+          processTranscript(transcript);
         }
       };
 
@@ -79,39 +80,73 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
     } else {
       setError('Speech recognition not supported. Please use Chrome, Edge, or Safari.');
     }
-  }, [transcript]);
+  }, [transcript, setInput, setIsOpen]);
 
-  // Speak response with female voice
+  // Speak response with female voice using multiple fallbacks
   const speakResponse = useCallback((text) => {
     if (isMuted || !speechSynthesisRef.current) return;
 
     // Cancel any ongoing speech
     speechSynthesisRef.current.cancel();
+    setSpeakingProgress(0);
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-IN';
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.rate = 0.9;
+    utterance.pitch = 1.1;
 
-    // Try to find a female voice
+    // Try multiple voice names to find a female voice
     const voices = speechSynthesisRef.current.getVoices();
-    console.log('Available voices:', voices.map(v => v.name));
+    console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
     
-    const femaleVoice = voices.find(v => 
-      v.name.toLowerCase().includes('female') || 
-      v.name.toLowerCase().includes('google us english') ||
-      v.name.toLowerCase().includes('samantha') ||
-      v.name.toLowerCase().includes('google uk english female')
-    );
-    
-    if (femaleVoice) {
-      utterance.voice = femaleVoice;
-      console.log('Using voice:', femaleVoice.name);
+    // Priority list of female voice names to search for
+    const femaleVoiceNames = [
+      'Google UK English Female',
+      'Samantha',
+      'Victoria',
+      'Fiona',
+      'Serena',
+      'Zira',
+      'Hazel',
+      'Susan',
+      'Google US English',
+      'David',
+      'Mark'
+    ];
+
+    let selectedVoice = null;
+    for (const name of femaleVoiceNames) {
+      selectedVoice = voices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
+      if (selectedVoice) break;
     }
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      console.log('Using voice:', selectedVoice.name);
+    } else {
+      console.log('No specific female voice found, using default');
+    }
+
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      setSpeakingProgress(0);
+    };
+    
+    utterance.onboundary = (event) => {
+      if (event.name === 'word') {
+        setSpeakingProgress((event.charIndex / text.length) * 100);
+      }
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setSpeakingProgress(100);
+      setTimeout(() => setSpeakingProgress(0), 1000);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setSpeakingProgress(0);
+    };
 
     speechSynthesisRef.current.speak(utterance);
   }, [isMuted]);
@@ -128,7 +163,7 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
       const user = userStr ? JSON.parse(userStr) : null;
       
       // Get websiteId from user or context
-      const websiteId = user?.websites?.[0]?.id || website_id;
+      const websiteId = user?.websites?.[0]?.id || 1;
       
       if (!websiteId) {
         console.error('No website ID found');
@@ -167,9 +202,9 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
         }
       }
     } catch (err) {
-      console.error('Voice command failed:', err);
-      setError(err.response?.data?.error || 'Failed to process command');
-      setResponse('Sorry, I encountered an error processing your request.');
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to process command';
+      setError(errorMessage);
+      setResponse('Sorry, I encountered an error: ' + errorMessage);
     } finally {
       setIsLoading(false);
       setIsListening(false);
@@ -217,96 +252,99 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
   return (
     <div className={`fixed bottom-6 right-6 z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
       {/* Voice Assistant Widget */}
-      {isOpen && (
-        <div className="absolute bottom-20 right-0 w-96 bg-slate-800/95 backdrop-blur-xl border border-slate-600 rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-900/50">
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${isLoading ? 'bg-amber-500 animate-pulse' : isSpeaking ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`}></div>
-              <h3 className="text-white font-semibold text-sm">Drishti Voice Assistant</h3>
-            </div>
-            <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">
-              <X className="w-5 h-5" />
-            </button>
+      <div className="absolute bottom-20 right-0 w-96 bg-slate-800/95 backdrop-blur-xl border border-slate-600 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-900/50">
+          <div className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${isLoading ? 'bg-amber-500 animate-pulse' : isSpeaking ? 'bg-green-500 animate-pulse' : 'bg-slate-500'}`}></div>
+            <h3 className="text-white font-semibold text-sm">Drishti Voice Assistant</h3>
           </div>
-
-          {/* Transcript Area */}
-          <div className="p-4 bg-slate-900/30 min-h-[80px] max-h-[150px] overflow-y-auto">
-            {transcript ? (
-              <p className="text-white text-sm whitespace-pre-wrap">{transcript}</p>
-            ) : isLoading ? (
-              <div className="flex items-center gap-2 text-slate-400 text-sm">
-                <Loader className="w-4 h-4 animate-spin" />
-                <span>Listening...</span>
-              </div>
-            ) : (
-              <p className="text-slate-500 text-sm italic">Hold microphone and speak</p>
-            )}
-          </div>
-
-          {/* Response Area */}
-          {response && (
-            <div className="px-4 pb-4">
-              <div className="bg-royal-900/20 border border-royal-700/30 rounded-lg p-3">
-                <p className="text-royal-300 text-sm">{response}</p>
-                {isSpeaking && (
-                  <div className="flex items-center gap-1 mt-2">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="w-1 h-3 bg-royal-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="px-4 pb-4">
-              <div className="bg-red-900/20 border border-red-700/30 rounded-lg p-3">
-                <p className="text-red-300 text-sm">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between p-4 border-t border-slate-700 bg-slate-900/50">
-            <button
-              onClick={toggleMute}
-              className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors"
-              title={isMuted ? "Unmute" : "Mute"}
-            >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-            </button>
-            <button
-              onClick={toggleListening}
-              disabled={isLoading}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                isListening 
-                  ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                  : 'bg-royal-600 hover:bg-royal-500 shadow-lg shadow-royal-900/50'
-              }`}
-              title="Hold to speak"
-            >
-              {isLoading ? (
-                <Loader className="w-6 h-6 text-white animate-spin" />
-              ) : isListening ? (
-                <MicOff className="w-6 h-6 text-white" />
-              ) : (
-                <Mic className="w-6 h-6 text-white" />
-              )}
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={!transcript.trim() || isLoading}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Send to AI"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
+          <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      )}
+
+        {/* Transcript Area */}
+        <div className="p-4 bg-slate-900/30 min-h-[80px] max-h-[150px] overflow-y-auto">
+          {transcript ? (
+            <p className="text-white text-sm whitespace-pre-wrap">{transcript}</p>
+          ) : isLoading ? (
+            <div className="flex items-center gap-2 text-slate-400 text-sm">
+              <Loader className="w-4 h-4 animate-spin" />
+              <span>Listening...</span>
+            </div>
+          ) : (
+            <p className="text-slate-500 text-sm italic">Hold microphone and speak</p>
+          )}
+        </div>
+
+        {/* Response Area */}
+        {response && (
+          <div className="px-4 pb-4">
+            <div className="bg-royal-900/20 border border-royal-700/30 rounded-lg p-3">
+              <p className="text-royal-300 text-sm">{response}</p>
+              {isSpeaking && (
+                <div className="flex items-center gap-1 mt-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="w-1 h-3 bg-royal-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>
+                  ))}
+                </div>
+              )}
+              {speakingProgress > 0 && speakingProgress < 100 && (
+                <div className="w-full bg-slate-700 h-1 mt-2 rounded-full overflow-hidden">
+                  <div className="bg-green-500 h-full transition-all duration-300" style={{ width: `${speakingProgress}%` }}></div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="px-4 pb-4">
+            <div className="bg-red-900/20 border border-red-700/30 rounded-lg p-3">
+              <p className="text-red-300 text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between p-4 border-t border-slate-700 bg-slate-900/50">
+          <button
+            onClick={toggleMute}
+            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors"
+            title={isMuted ? "Unmute" : "Mute"}
+          >
+            {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={toggleListening}
+            disabled={isLoading}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+              isListening 
+                ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
+                : 'bg-royal-600 hover:bg-royal-500 shadow-lg shadow-royal-900/50'
+            }`}
+            title="Hold to speak"
+          >
+            {isLoading ? (
+              <Loader className="w-6 h-6 text-white animate-spin" />
+            ) : isListening ? (
+              <MicOff className="w-6 h-6 text-white" />
+            ) : (
+              <Mic className="w-6 h-6 text-white" />
+            )}
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!transcript.trim() || isLoading}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Send to AI"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
 
       {/* Floating Microphone Button */}
       <button
