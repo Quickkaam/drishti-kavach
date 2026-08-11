@@ -462,6 +462,7 @@ export default function DashboardLayout() {
           background: 'rgba(4, 8, 16, 0.9)',
           backdropFilter: 'blur(12px)',
           borderBottom: `1px solid ${borderColor}`,
+          zIndex: 50,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <button
