@@ -33,6 +33,7 @@ async function generateReport(websiteId, period = '30d') {
       { data: securityEventsData },
       { data: ddosEventsData },
       { data: blockedIpsData },
+      { data: eventsData },
     ] = await Promise.all([
       supabase
         .from('events')
@@ -65,21 +66,28 @@ async function generateReport(websiteId, period = '30d') {
         .eq('website_id', websiteId)
         .gte('created_at', since)
         .order('created_at', { ascending: false })
-        .limit(100),
+        .limit(500),
       supabase
         .from('ddos_events')
         .select('*')
         .eq('website_id', websiteId)
         .gte('created_at', since)
         .order('created_at', { ascending: false })
-        .limit(50),
+        .limit(200),
       supabase
         .from('ip_block_list')
         .select('*')
         .eq('website_id', websiteId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-        .limit(50),
+        .limit(200),
+      supabase
+        .from('events')
+        .select('user_ip, page_url, country, city, timestamp')
+        .eq('website_id', websiteId)
+        .gte('timestamp', since)
+        .order('timestamp', { ascending: false })
+        .limit(200),
     ]).catch(err => {
       console.error('[AI REPORTS] Database fetch error:', err);
       throw err;
@@ -115,6 +123,7 @@ async function generateReport(websiteId, period = '30d') {
       recentSecurityEvents: securityEventsData || [],
       recentDdosEvents: ddosEventsData || [],
       activeBlockList: blockedIpsData || [],
+      ipLogs: eventsData || [],
     };
 
     // Generate AI analysis
