@@ -228,8 +228,6 @@ export default function DrishtiAI() {
             <option value="openrouter">OpenRouter</option>
           </select>
         </div>
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
-          Guardian Mode Active
       </div>
 
       {/* Quick Prompts */}

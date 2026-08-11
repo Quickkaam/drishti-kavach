@@ -16,10 +16,28 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [speakingProgress, setSpeakingProgress] = useState(0);
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
 
   const recognitionRef = useRef(null);
   const speechSynthesisRef = useRef(window.speechSynthesis);
+  const voicesRef = useRef([]);
+
+  // Load voices on mount (Chrome loads them asynchronously)
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      // Load SpeechSynthesis voices
+      const loadVoices = () => {
+        voicesRef.current = window.speechSynthesis.getVoices();
+        console.log('Loaded voices:', voicesRef.current.map(v => v.name));
+        setVoicesLoaded(true);
+      };
+
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    } else {
+      setError('Speech recognition not supported. Please use Chrome, Edge, or Safari.');
+    }
+  }, []);
 
   // Initialize Speech Recognition (Browser native)
   useEffect(() => {
@@ -77,78 +95,71 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
       };
 
       recognitionRef.current = recognition;
-    } else {
-      setError('Speech recognition not supported. Please use Chrome, Edge, or Safari.');
     }
   }, [transcript, setInput, setIsOpen]);
 
-  // Speak response with female voice using multiple fallbacks
+  // Speak response with female voice using cached voices
   const speakResponse = useCallback((text) => {
     if (isMuted || !speechSynthesisRef.current) return;
 
     // Cancel any ongoing speech
     speechSynthesisRef.current.cancel();
-    setSpeakingProgress(0);
+
+    // Ensure voices are loaded
+    if (voicesRef.current.length === 0) {
+      voicesRef.current = window.speechSynthesis.getVoices();
+    }
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-IN';
-    utterance.rate = 0.9;
-    utterance.pitch = 1.1;
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
 
-    // Try multiple voice names to find a female voice
-    const voices = speechSynthesisRef.current.getVoices();
-    console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
+    // Use cached voices
+    const voices = voicesRef.current;
     
-    // Priority list of female voice names to search for
-    const femaleVoiceNames = [
-      'Google UK English Female',
-      'Samantha',
-      'Victoria',
-      'Fiona',
-      'Serena',
-      'Zira',
-      'Hazel',
-      'Susan',
-      'Google US English',
-      'David',
-      'Mark'
-    ];
-
-    let selectedVoice = null;
-    for (const name of femaleVoiceNames) {
-      selectedVoice = voices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
-      if (selectedVoice) break;
-    }
+    console.log('Available voices:', voices.map(v => ({ name: v.name, lang: v.lang })));
+    
+    // Priority: Find Zira (Microsoft female voice on Windows)
+    // Also try other common female voice names
+    const femaleVoiceNames = ['zira', 'susan', 'hazel', 'alice', 'anna', 'karen', 'natalia', 'martha', 'sarah', 'heera', 'rekha'];
+    
+    let selectedVoice = voices.find(v => 
+      femaleVoiceNames.some(name => v.name.toLowerCase().includes(name)) || 
+      v.name.toLowerCase().includes('female')
+    );
 
     if (selectedVoice) {
       utterance.voice = selectedVoice;
-      console.log('Using voice:', selectedVoice.name);
+      console.log('Using female voice:', selectedVoice.name, 'Language:', selectedVoice.lang);
+    } else if (voices.length > 0) {
+      // Use first available voice as fallback
+      utterance.voice = voices[0];
+      console.log('Using default voice:', voices[0].name);
     } else {
-      console.log('No specific female voice found, using default');
+      console.log('No voices available for speech');
     }
 
     utterance.onstart = () => {
       setIsSpeaking(true);
-      setSpeakingProgress(0);
+      console.log('Speech started');
     };
-    
-    utterance.onboundary = (event) => {
-      if (event.name === 'word') {
-        setSpeakingProgress((event.charIndex / text.length) * 100);
-      }
-    };
-
     utterance.onend = () => {
       setIsSpeaking(false);
-      setSpeakingProgress(100);
-      setTimeout(() => setSpeakingProgress(0), 1000);
+      console.log('Speech ended');
     };
-    utterance.onerror = () => {
+    utterance.onerror = (event) => {
       setIsSpeaking(false);
-      setSpeakingProgress(0);
+      console.error('Speech error:', event.error);
     };
 
-    speechSynthesisRef.current.speak(utterance);
+    // Speak the text
+    try {
+      speechSynthesisRef.current.speak(utterance);
+      console.log('Speaking response');
+    } catch (err) {
+      console.error('Failed to speak:', err);
+    }
   }, [isMuted]);
 
   const processTranscript = async (text = transcript) => {
@@ -165,9 +176,9 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
       // Get websiteId from user or context
       const websiteId = user?.websites?.[0]?.id || 1;
       
-      if (!websiteId) {
-        console.error('No website ID found');
-        setError('No website selected. Please select a website in your profile settings.');
+      if (!websiteId || !user) {
+        console.error('No website ID or user found');
+        setError('Please log in and ensure you have website access in your profile settings.');
         setIsLoading(false);
         return;
       }
@@ -188,6 +199,10 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
         if (shouldSpeak) {
           speakResponse(data.response);
         }
+      } else {
+        // Fallback if response is missing
+        setResponse('I received your command but could not generate a response.');
+        console.warn('Voice API returned no response field:', data);
       }
 
       if (data.command_result) {
@@ -288,11 +303,6 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
                   {[1, 2, 3].map(i => (
                     <div key={i} className="w-1 h-3 bg-royal-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>
                   ))}
-                </div>
-              )}
-              {speakingProgress > 0 && speakingProgress < 100 && (
-                <div className="w-full bg-slate-700 h-1 mt-2 rounded-full overflow-hidden">
-                  <div className="bg-green-500 h-full transition-all duration-300" style={{ width: `${speakingProgress}%` }}></div>
                 </div>
               )}
             </div>
