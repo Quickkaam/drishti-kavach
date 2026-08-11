@@ -122,8 +122,19 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput }) {
     setError(null);
 
     try {
-      const user = JSON.parse(localStorage.getItem('dk_user'));
-      const websiteId = user.websites?.[0]?.id;
+      // Get user from localStorage
+      const userStr = localStorage.getItem('dk_user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      
+      // Get websiteId from user or context
+      const websiteId = user?.websites?.[0]?.id || website_id;
+      
+      if (!websiteId) {
+        console.error('No website ID found');
+        setError('No website selected. Please select a website in your profile settings.');
+        setIsLoading(false);
+        return;
+      }
 
       console.log('Sending to voice API:', text);
       
