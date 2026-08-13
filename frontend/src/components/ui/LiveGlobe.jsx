@@ -74,19 +74,32 @@ export default function LiveGlobe() {
   // Server location — Mumbai
   const SERVER = { lat: 19.076, lng: 72.877 };
 
-  // Fetch historical sessions & manually pinned IPs — use real lat/lon stored in the database
+  // Fetch historical sessions & manually pinned IPs & historical attacks
   useEffect(() => {
     Promise.all([
       api.get('/analytics/website/1/sessions?limit=50'),
-      api.get('/security/map-pins')
+      api.get('/security/map-pins'),
+      api.get('/security/events?limit=50')
     ])
-      .then(([sessionsRes, pinsRes]) => {
+      .then(([sessionsRes, pinsRes, eventsRes]) => {
         const sessions = sessionsRes.data || [];
         const pins = pinsRes.data || [];
+        const attacks = eventsRes.data?.events || [];
         
-        const initialArcs = [];
-        const initialPoints = [];
+        const initialVisitorArcs = [];
+        const initialVisitorPoints = [];
+        const initialAttackArcs = [];
+        const initialAttackPoints = [];
         
+        // Helper to hash IP to pseudo-location for attacks without lat/lon
+        const getPseudoLocation = (ip) => {
+          const keys = Object.keys(COUNTRY_COORDS);
+          if (!ip) return COUNTRY_COORDS[keys[0]];
+          let hash = 0;
+          for (let i = 0; i < ip.length; i++) hash = ip.charCodeAt(i) + ((hash << 5) - hash);
+          return COUNTRY_COORDS[keys[Math.abs(hash) % keys.length]];
+        };
+
         // 1. Plot normal sessions (Blue)
         sessions.forEach(session => {
           const lat = parseFloat(session.latitude);
@@ -94,13 +107,13 @@ export default function LiveGlobe() {
           if (!lat || !lng || (lat === 0 && lng === 0)) return; 
           
           const color = '#00d4ff';
-          initialArcs.push({
+          initialVisitorArcs.push({
             startLat: lat, startLng: lng,
             endLat: SERVER.lat, endLng: SERVER.lng,
             color,
             label: `${session.user_ip} — ${session.city || ''}, ${session.country || ''}`.trim(),
           });
-          initialPoints.push({
+          initialVisitorPoints.push({
             lat, lng, size: 0.3, color,
             label: `${session.user_ip} — ${session.city || ''}, ${session.country || ''}`.trim(),
           });
@@ -113,20 +126,40 @@ export default function LiveGlobe() {
           if (!lat || !lng) return;
           
           const color = '#ff00ff'; // Distinct color for manual pins
-          initialArcs.push({
+          initialVisitorArcs.push({
             startLat: lat, startLng: lng,
             endLat: SERVER.lat, endLng: SERVER.lng,
             color,
             label: `📍 PINNED: ${pin.ip} — ${pin.city || ''}, ${pin.country || ''}`.trim(),
           });
-          initialPoints.push({
-            lat, lng, size: 0.5, color, // slightly larger point
+          initialVisitorPoints.push({
+            lat, lng, size: 0.5, color,
             label: `📍 PINNED: ${pin.ip} — ${pin.city || ''}, ${pin.country || ''}`.trim(),
           });
         });
+
+        // 3. Plot historical attacks (Red/Orange)
+        attacks.forEach(attack => {
+          const loc = getPseudoLocation(attack.user_ip);
+          const isCritical = attack.severity === 'critical' || attack.severity === 'high';
+          const color = isCritical ? '#ff3d3d' : '#f5b041';
+          
+          initialAttackArcs.push({
+            startLat: loc.lat, startLng: loc.lng,
+            endLat: SERVER.lat, endLng: SERVER.lng,
+            color,
+            label: attack.user_ip,
+            severity: attack.severity,
+          });
+          initialAttackPoints.push({
+            lat: loc.lat, lng: loc.lng, size: isCritical ? 0.6 : 0.4, color, label: attack.user_ip
+          });
+        });
         
-        setVisitorArcs(initialArcs);
-        setVisitorPoints(initialPoints);
+        setVisitorArcs(initialVisitorArcs);
+        setVisitorPoints(initialVisitorPoints);
+        setArcsData(initialAttackArcs);
+        setPointsData(initialAttackPoints);
       })
       .catch(err => console.error('[LiveGlobe] Failed to fetch initial data', err));
   }, []);
