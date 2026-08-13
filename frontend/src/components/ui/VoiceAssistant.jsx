@@ -269,7 +269,7 @@ export default function VoiceAssistant({ isOpen: externalIsOpen, setIsOpen: exte
   }
 
   return (
-    <div className="fixed bottom-6 right-24 z-50 flex flex-col items-end">
+    <div className="fixed bottom-6 right-20 z-50 flex flex-col items-end">
       {/* Voice Assistant Widget Window */}
       <div className={`absolute bottom-20 right-0 w-96 bg-slate-800/95 backdrop-blur-xl border border-slate-600 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-bottom-right ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
         {/* Header */}
@@ -299,7 +299,7 @@ export default function VoiceAssistant({ isOpen: externalIsOpen, setIsOpen: exte
 
         {/* Response Area */}
         {response && (
-          <div className="px-4 pb-4">
+          <div className="px-4 pb-4 max-h-[250px] overflow-y-auto">
             <div className="bg-indigo-900/20 border border-indigo-700/30 rounded-lg p-3">
               <p className="text-indigo-300 text-sm">{response}</p>
               {isSpeaking && (

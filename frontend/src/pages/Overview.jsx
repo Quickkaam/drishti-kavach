@@ -65,7 +65,7 @@ export default function Overview() {
           </div>
           
           {/* Bottom Half: Drishti AI Console */}
-          <div className="flex-1 min-h-0 h-full">
+          <div className="flex-1 min-h-0 h-full flex flex-col">
             <DrishtiAIConsole />
           </div>
           

@@ -155,7 +155,7 @@ export default function DrishtiAIConsole() {
 
   return (
     <div 
-      className={`rounded-lg flex flex-col transition-all duration-300 accent-line-top animate-border-glow slide-in-3 ${isCollapsed ? 'h-[50px]' : 'h-full min-h-[300px]'}`}
+      className={`rounded-lg flex flex-col transition-all duration-300 accent-line-top animate-border-glow slide-in-3 ${isCollapsed ? 'h-[50px]' : 'flex-1 min-h-0 h-full'}`}
       style={{
         background: 'linear-gradient(135deg, rgba(4, 12, 26, 0.95) 0%, rgba(10, 6, 30, 0.95) 100%)',
         border: '1px solid rgba(138, 43, 226, 0.25)',

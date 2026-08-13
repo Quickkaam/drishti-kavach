@@ -257,7 +257,7 @@ export default function DrishtiAI() {
   };
 
   return (
-    <div className="flex flex-col h-full max-h-[calc(100vh-8rem)]">
+    <div className="flex flex-col h-screen overflow-hidden">
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-4 flex-shrink-0">
@@ -291,7 +291,7 @@ export default function DrishtiAI() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar" style={{ minHeight: 0 }}>
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {/* Avatar - Logo for AI, Emoji for user */}
