@@ -176,7 +176,7 @@ export default function DashboardLayout() {
         }}>
           {/* Logo image */}
           <img
-            src="/drishti-kavach-logo.png"
+            src="/logo.png"
             alt="Drishti Kavach"
             style={{
               width: collapsed ? '36px' : '44px',
