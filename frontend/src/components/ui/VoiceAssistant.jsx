@@ -8,7 +8,10 @@ import { Mic, MicOff, X, Loader, Send, Volume2, VolumeX } from 'lucide-react';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
-export default function VoiceAssistant({ isOpen, setIsOpen, setInput, onSubmit }) {
+export default function VoiceAssistant({ isOpen: externalIsOpen, setIsOpen: externalSetIsOpen, setInput, onSubmit }) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const setIsOpen = externalSetIsOpen || setInternalIsOpen;
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
@@ -266,9 +269,9 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput, onSubmit }
   }
 
   return (
-    <div className={`fixed bottom-6 right-6 z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-      {/* Voice Assistant Widget */}
-      <div className="absolute bottom-20 right-0 w-96 bg-slate-800/95 backdrop-blur-xl border border-slate-600 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="fixed bottom-6 right-24 z-50 flex flex-col items-end">
+      {/* Voice Assistant Widget Window */}
+      <div className={`absolute bottom-20 right-0 w-96 bg-slate-800/95 backdrop-blur-xl border border-slate-600 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-bottom-right ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-900/50">
           <div className="flex items-center gap-2">
@@ -297,12 +300,12 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput, onSubmit }
         {/* Response Area */}
         {response && (
           <div className="px-4 pb-4">
-            <div className="bg-royal-900/20 border border-royal-700/30 rounded-lg p-3">
-              <p className="text-royal-300 text-sm">{response}</p>
+            <div className="bg-indigo-900/20 border border-indigo-700/30 rounded-lg p-3">
+              <p className="text-indigo-300 text-sm">{response}</p>
               {isSpeaking && (
                 <div className="flex items-center gap-1 mt-2">
                   {[1, 2, 3].map(i => (
-                    <div key={i} className="w-1 h-3 bg-royal-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>
+                    <div key={i} className="w-1 h-3 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}></div>
                   ))}
                 </div>
               )}
@@ -334,7 +337,7 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput, onSubmit }
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
               isListening 
                 ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                : 'bg-royal-600 hover:bg-royal-500 shadow-lg shadow-royal-900/50'
+                : 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-900/50'
             }`}
             title="Hold to speak"
           >
@@ -361,7 +364,7 @@ export default function VoiceAssistant({ isOpen, setIsOpen, setInput, onSubmit }
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all hover:scale-110 ${
-          isOpen ? 'bg-slate-700' : 'bg-royal-600 hover:bg-royal-500'
+          isOpen ? 'bg-slate-700' : 'bg-indigo-600 hover:bg-indigo-500'
         }`}
         title="Open Voice Assistant"
       >
