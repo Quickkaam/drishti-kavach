@@ -39,8 +39,8 @@ router.use(requireAuth);
 // Rate limiter for AI chat (30 requests per minute per IP)
 const aiChatLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
-  message: { error: 'AI request limit exceeded' },
+  max: 50,
+  message: { error: 'AI request limit exceeded. Please wait a moment.' },
 });
 
 router.post('/chat', aiChatLimiter, validate(aiChatSchema), async (req, res) => {
@@ -443,4 +443,5 @@ router.post('/execute-suggestion', requireAuth, async (req, res) => {
 });
 
 module.exports = router;
+
 
