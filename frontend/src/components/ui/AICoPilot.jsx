@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { usePageContext } from '../../context/PageContext';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/client';
 
 const AICoPilot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -33,32 +34,20 @@ const AICoPilot = () => {
   const fetchInsights = async (userQuery = '') => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/ai/copilot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          page: currentPage,
-          context: pageData,
-          website_id: currentWebsiteId,
-          query: userQuery
-        })
+      const { data } = await api.post('/ai/copilot', {
+        page: currentPage,
+        context: pageData,
+        website_id: currentWebsiteId,
+        query: userQuery
       });
 
-      const data = await response.json();
-      
-      if (response.ok) {
-        setInsights(data.insights || 'No specific insights found.');
-        setSuggestions(data.suggestions || []);
-      } else {
-        setInsights(data.error || 'Failed to analyze page context.');
-        setSuggestions([]);
-      }
+      // Axios throws error on non-2xx status, so if we reach here, it's successful
+      setInsights(data.insights || 'No specific insights found.');
+      setSuggestions(data.suggestions || []);
+
     } catch (err) {
       console.error('Co-Pilot API Error:', err);
-      setInsights('I am having trouble connecting to my neural network.');
+      setInsights('I am having trouble connecting to my neural network. Error: ' + (err.response?.data?.error || err.message));
       setSuggestions([]);
     } finally {
       setIsLoading(false);
@@ -68,31 +57,18 @@ const AICoPilot = () => {
   const handleActionClick = async (suggestion) => {
     setIsExecuting(true);
     try {
-      const response = await fetch('/api/ai/execute-suggestion', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          action: suggestion.action,
-          target: suggestion.target,
-          website_id: currentWebsiteId,
-          reasoning: suggestion.reasoning || `Triggered by Co-Pilot from ${currentPage} page`
-        })
+      const { data } = await api.post('/ai/execute-suggestion', {
+        action: suggestion.action,
+        target: suggestion.target,
+        website_id: currentWebsiteId,
+        reasoning: suggestion.reasoning || `Triggered by Co-Pilot from ${currentPage} page`
       });
 
-      const data = await response.json();
-      if (response.ok) {
-        // Simple visual feedback; in a real app, use a toast notification
-        alert(`Action successful: ${data.message || 'Executed'}`);
-        // Refresh insights after action
-        fetchInsights();
-      } else {
-        alert(`Action failed: ${data.error}`);
-      }
+      alert(`Action successful: ${data.message || 'Executed'}`);
+      // Refresh insights after action
+      fetchInsights();
     } catch (err) {
-      alert('Error executing action. Check console.');
+      alert(`Action failed: ${err.response?.data?.error || err.message}`);
     } finally {
       setIsExecuting(false);
     }

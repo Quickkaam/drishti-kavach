@@ -293,7 +293,7 @@ Respond with valid JSON only.`;
     }
 
     // Save voice session
-    await supabase.insert('voice_sessions', {
+    await supabase.from('voice_sessions').insert({
       user_id: userId,
       website_id: websiteId,
       transcript,
