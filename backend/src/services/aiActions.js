@@ -131,14 +131,36 @@ const executeAiAction = async (decision) => {
   // High risk stays as 'pending' for HITL
 
   // ── LOG THE DECISION ────────────────────────────────────────
-  const { data: loggedDecision } = await supabase
-    .from('ai_decisions')
-    .insert({
-      website_id, event_id, ip, decision_type, reasoning,
-      confidence_score, risk_level, status, action_result, model_used
-    })
-    .select('*')
-    .single();
+  let loggedDecision = null;
+  try {
+    // Try insert with risk_level column
+    const { data, error } = await supabase
+      .from('ai_decisions')
+      .insert({
+        website_id, event_id, ip, decision_type, reasoning,
+        confidence_score, risk_level, status, action_result, model_used
+      })
+      .select('*')
+      .single();
+    
+    if (error) {
+      // Fallback: column might not exist yet in live DB
+      console.warn('[AI ACTION] Insert with risk_level failed, trying without:', error.message);
+      const { data: fallbackData } = await supabase
+        .from('ai_decisions')
+        .insert({
+          website_id, event_id, ip, decision_type, reasoning,
+          confidence_score, status, action_result, model_used
+        })
+        .select('*')
+        .single();
+      loggedDecision = fallbackData;
+    } else {
+      loggedDecision = data;
+    }
+  } catch (insertErr) {
+    console.error('[AI ACTION] Failed to log decision:', insertErr.message);
+  }
 
   // ── AUDIT LOG (SOC 2 Compliance) ────────────────────────────
   await logAudit({
