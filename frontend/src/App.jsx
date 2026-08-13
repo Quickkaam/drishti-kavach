@@ -7,6 +7,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { PageProvider } from './context/PageContext';
 import { ThemeProvider } from './components/ui/ThemeToggle';
 import { ErrorBoundary, NotFoundPage, ServerErrorPage } from './components/ui/ErrorPages';
 import { SuspenseFallback } from './components/ui/SkeletonLoader';
@@ -54,8 +55,9 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
-          <SocketProvider>
-            <Routes>
+          <PageProvider>
+            <SocketProvider>
+              <Routes>
               <Route path="/login" element={lazyLoad(LoginPage)} />
               <Route path="/privacy" element={lazyLoad(PrivacyPolicy)} />
               <Route path="/terms" element={lazyLoad(TermsConditions)} />
@@ -96,7 +98,8 @@ export default function App() {
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </SocketProvider>
-        </AuthProvider>
+        </PageProvider>
+      </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

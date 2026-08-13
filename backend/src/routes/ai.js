@@ -45,7 +45,8 @@ const aiChatLimiter = rateLimit({
 
 router.post('/chat', aiChatLimiter, validate(aiChatSchema), async (req, res) => {
   try {
-    const { question, website_id, session_id, provider } = req.body;
+    const { website_id, session_id, provider } = req.body;
+    const question = req.body.question || req.body.message;
     if (!question) return res.status(400).json({ error: 'Question required' });
 
     console.log('[AI Chat] User ID:', req.user?.id);
@@ -97,6 +98,39 @@ router.get('/decisions', async (req, res) => {
     res.json({ decisions: data });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch AI decisions' });
+  }
+});
+
+// POST /api/ai/rollback/:id — Rollback an AI decision
+router.post('/rollback/:id', requireRole('admin', 'analyst', 'superadmin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rollbackAiAction } = require('../services/aiActions');
+    
+    // Pass the user's email or username for audit trailing
+    const userIdentifier = req.user.email || req.user.username;
+    
+    const result = await rollbackAiAction(id, userIdentifier);
+    res.json({ success: true, message: 'Action successfully reverted', decision: result });
+  } catch (err) {
+    console.error('[AI ROLLBACK ERROR]', err.message);
+    res.status(400).json({ error: err.message || 'Failed to rollback action' });
+  }
+});
+
+// POST /api/ai/approve/:id — Approve an AI decision (HITL)
+router.post('/approve/:id', requireRole('admin', 'analyst', 'superadmin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { approveAiAction } = require('../services/aiActions');
+    
+    const userIdentifier = req.user.email || req.user.username;
+    
+    const result = await approveAiAction(id, userIdentifier);
+    res.json({ success: true, message: 'Action successfully approved and executed', decision: result });
+  } catch (err) {
+    console.error('[AI APPROVE ERROR]', err.message);
+    res.status(400).json({ error: err.message || 'Failed to approve action' });
   }
 });
 
@@ -371,6 +405,47 @@ router.post('/settings', requireRole('admin'), async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// POST /api/ai/copilot - Dashboard Co-Pilot insights
+router.post('/copilot', requireAuth, async (req, res) => {
+  try {
+    const { page, context, query, website_id } = req.body;
+    if (!website_id) return res.status(400).json({ error: 'website_id required' });
+    
+    const result = await aiService.generateCoPilotInsights(page, context, query);
+    res.json(result);
+  } catch (err) {
+    console.error('[CoPilot Error]', err.message);
+    res.status(500).json({ error: 'Failed to generate insights' });
+  }
+});
+
+// POST /api/ai/execute-suggestion - Execute one-click Co-Pilot actions
+router.post('/execute-suggestion', requireAuth, async (req, res) => {
+  try {
+    const { action, target, website_id, reasoning } = req.body;
+    if (!website_id) return res.status(400).json({ error: 'website_id required' });
+
+    const { executeAiAction } = require('../services/aiActions');
+    
+    // Convert suggestion to an AI Decision payload
+    const decision = {
+      website_id,
+      ip: target,
+      decision_type: action,
+      reasoning: reasoning || 'Manual one-click action via Co-Pilot',
+      confidence_score: 100, // User-initiated
+      risk_level: 'low', // Auto-execute since user explicitly clicked it
+      model_used: 'copilot_manual'
+    };
+
+    const result = await executeAiAction(decision);
+    res.json({ success: true, message: result.action_result, decision: result });
+  } catch (err) {
+    console.error('[CoPilot Action Error]', err.message);
+    res.status(500).json({ error: 'Failed to execute action' });
   }
 });
 

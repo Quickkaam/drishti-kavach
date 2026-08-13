@@ -9,6 +9,7 @@ import LiveGlobe from '../components/ui/LiveGlobe';
 import IncidentFeed from '../components/ui/IncidentFeed';
 import DrishtiAIConsole from '../components/ui/DrishtiAIConsole';
 import SystemHealthDashboard from '../components/ui/SystemHealthDashboard';
+import FederationWidget from '../components/ui/FederationWidget';
 
 export default function Overview() {
   const [stats, setStats] = useState({});
@@ -63,6 +64,11 @@ export default function Overview() {
           {/* Bottom Half: Drishti AI Console */}
           <div className="flex-1 min-h-0 h-full">
             <DrishtiAIConsole />
+          </div>
+          
+          {/* Federation Intelligence Widget */}
+          <div className="flex-shrink-0">
+            <FederationWidget />
           </div>
         </div>
 

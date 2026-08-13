@@ -13,15 +13,6 @@ const { blockIpCloudflare, unblockIpCloudflare } = require('../services/cloudfla
 const router = express.Router();
 router.use(requireAuth);
 
-// GET /api/ip/:ip — Intelligence lookup
-router.get('/:ip', async (req, res) => {
-  try {
-    const intel = await getIpIntel(req.params.ip);
-    res.json({ intel });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch IP intel' });
-  }
-});
 
 // GET /api/ip/blocked — List blocked IPs
 router.get('/blocked/list', async (req, res) => {
@@ -39,6 +30,25 @@ router.get('/blocked/list', async (req, res) => {
     const { data, error } = await query;
     if (error) throw error;
     res.json({ blocked: data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch blocked IPs' });
+  }
+});
+
+// GET /api/ip/blocked — Raw blocked IP array (test requirement)
+router.get('/blocked', async (req, res) => {
+  try {
+    const { website_id, page = 1, limit = 50 } = req.query;
+    let query = supabase
+      .from('ip_block_list')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
+    if (website_id) query = query.eq('website_id', website_id);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch blocked IPs' });
   }
@@ -143,6 +153,16 @@ router.delete('/whitelist/:id', requireRole('admin'), async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to remove from whitelist' });
+  }
+});
+
+// GET /api/ip/:ip — Intelligence lookup
+router.get('/:ip', async (req, res) => {
+  try {
+    const intel = await getIpIntel(req.params.ip);
+    res.json({ intel });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch IP intel' });
   }
 });
 

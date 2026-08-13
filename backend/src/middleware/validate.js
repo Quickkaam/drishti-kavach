@@ -65,11 +65,15 @@ const createUserSchema = z.object({
 });
 
 const aiChatSchema = z.object({
-  question: z.string().min(1),
+  question: z.string().min(1).optional(),
+  message: z.string().min(1).optional(),
   website_id: z.number().or(z.string()),
   session_id: z.string().uuid().optional(),
   provider: z.string().optional(),
-});
+}).refine(
+  (data) => data.question || data.message,
+  { message: 'Either question or message must be provided' }
+);
 
 module.exports = {
   validate,

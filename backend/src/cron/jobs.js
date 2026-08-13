@@ -8,6 +8,7 @@ const { runCleanup } = require('../routes/cleanup');
 const { generateDailySummary } = require('../services/ai');
 const { generateDailySummary: generateGuardianSummary } = require('../services/aiGuardian');
 const { checkTrafficSpike, checkIpFlood } = require('../services/ddos');
+const { processLogs } = require('../services/aiTriage');
 const { cleanupOldLogs } = require('../services/logging');
 const { sendAlert } = require('../services/alerts');
 
@@ -37,6 +38,15 @@ function startCronJobs() {
       }
     } catch (err) {
       console.error('[CRON DDoS]', err.message);
+    }
+  });
+
+  // Every 5 minutes: AI Triage processing
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      await processLogs();
+    } catch (err) {
+      console.error('[CRON AI TRIAGE]', err.message);
     }
   });
 

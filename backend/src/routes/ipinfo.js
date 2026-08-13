@@ -9,6 +9,7 @@ const { enrichIp, summariseIps } = require('../services/ipinfo');
 const router = express.Router();
 router.use(requireAuth);
 
+
 // GET /api/ipinfo/enrich?ip=x.x.x.x  (defaults to caller's IP)
 router.get('/enrich', async (req, res) => {
   try {
@@ -70,6 +71,18 @@ router.post('/map', async (req, res) => {
     res.json({ points });
   } catch (err) {
     res.status(500).json({ error: 'Failed to map IPs' });
+  }
+});
+
+// GET /api/ipinfo/:ip — Enrich specific IP (requires auth)
+router.get('/:ip', async (req, res) => {
+  try {
+    const ip = req.params.ip;
+    const data = await enrichIp(ip);
+    res.json({ ip, ...data });
+  } catch (err) {
+    console.error('IPInfo param error', err);
+    res.status(500).json({ error: 'Failed to enrich IP' });
   }
 });
 

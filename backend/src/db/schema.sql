@@ -362,22 +362,26 @@ CREATE INDEX IF NOT EXISTS idx_incidents_website_id ON incidents(website_id);
 CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
 CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity);
 
--- ─── 14. AI DECISIONS ─────────────────────────────────────────
+-- ─── 14. AI DECISIONS (Autonomous Actions) ──────────────────────
 CREATE TABLE IF NOT EXISTS ai_decisions (
   id BIGSERIAL PRIMARY KEY,
   website_id BIGINT REFERENCES websites(id) ON DELETE CASCADE,
   event_id BIGINT,
   ip INET,
-  decision_type VARCHAR(50),  -- investigate, block, escalate, dismiss
+  decision_type VARCHAR(50),  -- investigate, block_ip, update_rate_limit, quarantine
   reasoning TEXT,
   confidence_score INTEGER,
-  action_taken BOOLEAN DEFAULT FALSE,
+  risk_level VARCHAR(20) DEFAULT 'low', -- low (auto), medium (auto+alert), high (HITL)
+  status VARCHAR(20) DEFAULT 'pending', -- pending, executed, failed, reverted
   action_result TEXT,
   model_used VARCHAR(50),
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  reverted_by VARCHAR(100),
+  reverted_at TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_ai_decisions_website_id ON ai_decisions(website_id);
 CREATE INDEX IF NOT EXISTS idx_ai_decisions_created ON ai_decisions(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_decisions_status ON ai_decisions(status);
 
 -- ─── 15. AI SESSIONS (Chat) ───────────────────────────────────
 CREATE TABLE IF NOT EXISTS ai_sessions (
@@ -532,6 +536,7 @@ INSERT INTO assistant_settings (setting_key, setting_value) VALUES
   ('alert_channels', '["slack", "telegram", "email"]'),
   ('daily_summary_enabled', '{"enabled": true, "time": "08:00"}'),
   ('auto_investigate', '{"enabled": true, "min_severity": "medium"}'),
+  ('training_mode', '{"enabled": false, "auto_execute": true, "suggest_only": false}'),
   ('ddos_thresholds', '{
     "traffic_spike_warning": 3,
     "traffic_spike_critical": 10,
@@ -575,7 +580,8 @@ INSERT INTO service_catalog (service_id, display_name, description, category, is
   ('phishing_simulation', 'Phishing Simulation', 'Employee training campaigns', 'security', FALSE),
   ('mobile_app', 'Mobile App', 'iOS/Android app access', 'premium', FALSE),
   ('api_access', 'Full API Access', 'API tokens for external integration', 'premium', FALSE),
-  ('sla_support', 'Priority Support', '8x5 or 24x7 support access', 'support', FALSE)
+  ('sla_support', 'Priority Support', '8x5 or 24x7 support access', 'support', FALSE),
+  ('federation', 'Federated Intelligence', 'Cross-website threat sharing and pre-emptive blocking', 'security', FALSE)
 ON CONFLICT (service_id) DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS idx_service_catalog_service_id ON service_catalog(service_id);
@@ -684,3 +690,17 @@ FROM websites w
 WHERE NOT EXISTS (
   SELECT 1 FROM client_services cs WHERE cs.website_id = w.id AND cs.service_id = 'ai_assistant'
 );
+
+-- ─── 32. FEDERATED SIGNATURES ──────────────────────────────────
+CREATE TABLE IF NOT EXISTS federated_signatures (
+  id BIGSERIAL PRIMARY KEY,
+  source_website_id BIGINT REFERENCES websites(id) ON DELETE SET NULL,
+  ip VARCHAR(50),
+  attack_type VARCHAR(50),
+  payload TEXT,
+  confidence_score INTEGER,
+  reasoning TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_federated_ip ON federated_signatures(ip);

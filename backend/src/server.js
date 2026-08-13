@@ -44,6 +44,7 @@ const analyticsRoutes = require('./routes/analytics');
 const mitreRoutes = require('./routes/mitre');
 const notificationRoutes = require('./routes/notifications');
 const sentinelRoutes = require('./routes/sentinel');
+const federationRoutes = require('./routes/federation');
 
 const app = express();
 const server = http.createServer(app);
@@ -150,6 +151,11 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Alias for legacy /health requests (required by test)
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'Drishti Kavach API' });
+});
+
 // ─── Routes ───────────────────────────────────────────────────
 
 // Public SDK (requires API key, not JWT)
@@ -185,6 +191,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/mitre', mitreRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/sentinel', sentinelRoutes);
+app.use('/api/federation', federationRoutes);
 app.use('/admin', sentinelRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────

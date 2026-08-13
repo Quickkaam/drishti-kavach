@@ -4,6 +4,7 @@
 
 import React, { useEffect, useState } from 'react';
 import api from '../api/client';
+import { usePageContext } from '../context/PageContext';
 
 const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
@@ -12,6 +13,8 @@ export default function SecurityEvents() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ severity: '', event_type: '', status: '' });
   const [selected, setSelected] = useState(null);
+  
+  const { setPageContext } = usePageContext();
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -30,6 +33,20 @@ export default function SecurityEvents() {
   };
 
   useEffect(() => { fetchEvents(); }, [filters]);
+
+  useEffect(() => {
+    setPageContext('security_events', {
+      events_count: events.length,
+      recent_events: events.slice(0, 10).map(e => ({
+        id: e.id,
+        severity: e.severity,
+        type: e.event_type,
+        ip: e.user_ip,
+        status: e.status
+      })),
+      applied_filters: filters
+    });
+  }, [events, filters, setPageContext]);
 
   const blockIp = async (ip, websiteId) => {
     try {

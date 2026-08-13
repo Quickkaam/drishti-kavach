@@ -12,6 +12,7 @@ import NotificationBell from '../ui/NotificationBell';
 import { Database, Bot, Cloud, Activity, LogOut, Shield } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
 import VoiceAssistant from '../ui/VoiceAssistant';
+import AICoPilot from '../ui/AICoPilot';
 
 const NAV = [
   { path: '/',            icon: '◈', label: 'OVERVIEW',        end: true },
@@ -662,6 +663,9 @@ export default function DashboardLayout() {
       
       {/* Voice Assistant Widget */}
       <VoiceAssistant />
+      
+      {/* AI Co-Pilot Widget */}
+      <AICoPilot />
     </div>
   );
 }

@@ -97,36 +97,39 @@ Respond with: { "threat_level": "low|medium|high|critical", "recommendation": "b
     }
 
     // Save AI decision
-    await supabase.from('ai_decisions').insert({
+    // Determine risk level based on confidence and threat level
+    let risk_level = 'low'; // default auto
+    if (decision.threat_level === 'critical' && decision.confidence >= 80) risk_level = 'low'; // High confidence + critical -> auto block
+    else if (decision.threat_level === 'high' || decision.confidence >= 60) risk_level = 'medium'; // Auto block + alert
+    else risk_level = 'high'; // low confidence -> HITL
+
+    // Map recommendation to decision_type
+    let decision_type = decision.recommendation;
+    if (decision_type === 'block') decision_type = 'block_ip';
+
+    const { executeAiAction } = require('./aiActions');
+    
+    // Execute the action (this logs to ai_decisions and executes block if risk is low/medium)
+    const executedDecision = await executeAiAction({
       website_id: websiteId,
       event_id: eventId,
       ip,
-      decision_type: decision.recommendation,
+      decision_type,
       reasoning: decision.reasoning,
       confidence_score: decision.confidence,
-      action_taken: false,
-      model_used: MODEL,
+      risk_level,
+      model_used: MODEL
     });
 
-    // Auto-block if confidence >= 80 and recommendation is block
-    const settings = await getAssistantSettings();
-    if (
-      decision.recommendation === 'block' &&
-      decision.confidence >= (settings.guardian_mode?.auto_block_threshold || 80)
-    ) {
-      await autoBlockIp(websiteId, ip, `Drishti AI: ${decision.reasoning.substring(0, 200)}`, io);
-
-      await supabase.from('ai_decisions').update({ action_taken: true, action_result: 'IP blocked' })
-        .eq('event_id', eventId).eq('ip', ip);
-
+    if (executedDecision.status === 'executed') {
       await sendNotification({
-        title: `🛡️ Drishti AI Auto-Blocked IP`,
-        message: `IP ${ip} blocked. Reason: ${decision.reasoning.substring(0, 150)}`,
+        title: `🛡️ Drishti AI Auto-Action Executed`,
+        message: `Action: ${decision_type} on ${ip}. Reason: ${decision.reasoning.substring(0, 150)}`,
         type: TYPES.SECURITY,
         severity: SEVERITY.CRITICAL,
         category: CATEGORIES.AI,
         targetRoles: [ROLES.SUPERADMIN, ROLES.ADMIN],
-        websiteId,
+        websiteId: websiteId,
         referenceType: 'security_event',
         referenceId: eventId,
         sendEmail: true,
@@ -136,7 +139,7 @@ Respond with: { "threat_level": "low|medium|high|critical", "recommendation": "b
         io
       });
     } else {
-      // Send a general notification for AI investigation that didn't result in auto-block
+      // Send a general notification for AI investigation that didn't result in auto-execution
       const alertSeverity = decision.threat_level === 'critical' ? SEVERITY.CRITICAL : decision.threat_level === 'high' ? SEVERITY.HIGH : SEVERITY.INFO;
       const alertType = decision.threat_level === 'critical' || decision.threat_level === 'high' ? TYPES.WARNING : TYPES.INFO;
       
@@ -407,6 +410,47 @@ async function callDeepSeek(userMessage, provider = null) {
   }
 }
 
+// Co-Pilot Insights Generator
+async function generateCoPilotInsights(page, context, query) {
+  const prompt = `You are Drishti, the SOC Dashboard Co-Pilot.
+The user is currently viewing the '${page}' page.
+Here is the raw data they are looking at:
+${JSON.stringify(context)}
+
+${query ? `User asked: "${query}"\nProvide insights addressing their query.` : 'Provide proactive insights based on the data.'}
+
+Your response MUST be valid JSON in this exact format:
+{
+  "insights": "2-3 sentences summarizing the most critical points in the data.",
+  "suggestions": [
+    {
+      "label": "Button text (e.g. Block IP 1.2.3.4)",
+      "action": "block_ip | quarantine_ip | ignore",
+      "target": "The IP address or target entity",
+      "reasoning": "Brief reason for the action"
+    }
+  ]
+}
+
+Ensure the output is ONLY valid JSON. Provide up to 3 actionable suggestions. If no actions are needed, return an empty array for suggestions.`;
+
+  const response = await callDeepSeek(prompt);
+  
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error('No JSON found in response');
+  } catch (err) {
+    console.error('[CoPilot] Failed to parse AI response:', err.message);
+    return {
+      insights: "I couldn't analyze this data right now. Please try again.",
+      suggestions: []
+    };
+  }
+}
+
 async function getAssistantSettings() {
   const { data } = await supabase
     .from('assistant_settings')
@@ -416,4 +460,4 @@ async function getAssistantSettings() {
   return settings;
 }
 
-module.exports = { autoInvestigate, chat, generateDailySummary, callDeepSeek };
+module.exports = { autoInvestigate, chat, generateDailySummary, callDeepSeek, generateCoPilotInsights };
