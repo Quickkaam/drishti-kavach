@@ -160,7 +160,8 @@ export default function DrishtiAIConsole() {
         background: 'linear-gradient(135deg, rgba(4, 12, 26, 0.95) 0%, rgba(10, 6, 30, 0.95) 100%)',
         border: '1px solid rgba(138, 43, 226, 0.25)',
         overflow: 'hidden',
-        position: 'relative'
+            overflowY: 'auto',
+            position: 'relative'
       }}
     >
       
@@ -247,3 +248,4 @@ export default function DrishtiAIConsole() {
     </div>
   );
 }
+
