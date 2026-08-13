@@ -12,7 +12,8 @@ const AICoPilot = () => {
   const [isExecuting, setIsExecuting] = useState(false);
 
   const { currentPage, pageData } = usePageContext();
-  const { currentWebsiteId, token } = useAuth();
+  const { user, token } = useAuth();
+  const currentWebsiteId = user?.websites?.[0]?.id || 1;
   
   const endOfMessagesRef = useRef(null);
 
