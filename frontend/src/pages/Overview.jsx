@@ -45,12 +45,15 @@ export default function Overview() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden min-h-[600px] pb-4">
         
         {/* Left Panel: Incident Feed (3 cols) */}
-        <div className="lg:col-span-3 h-full overflow-hidden">
+        <div className="lg:col-span-3 h-full overflow-hidden slide-in-1">
           <IncidentFeed events={threats} />
         </div>
 
         {/* Center Panel: Live Globe Monitor (6 cols) */}
-        <div className="lg:col-span-6 h-full rounded-lg overflow-hidden border border-white/10 relative">
+        <div 
+          className="lg:col-span-6 h-full rounded-lg overflow-hidden border relative slide-in-2"
+          style={{ borderColor: 'rgba(138, 43, 226, 0.25)' }}
+        >
           <LiveGlobe />
         </div>
 
@@ -67,7 +70,7 @@ export default function Overview() {
           </div>
           
           {/* Federation Intelligence Widget */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 slide-in-4">
             <FederationWidget />
           </div>
         </div>

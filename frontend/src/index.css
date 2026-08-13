@@ -16,6 +16,10 @@
   --cyan: #00d4ff;
   --cyan-dim: #0088aa;
   --cyan-glow: rgba(0, 212, 255, 0.15);
+  --purple: #8a2be2;
+  --purple-light: #b388ff;
+  --purple-dim: #5a189a;
+  --purple-glow: rgba(138, 43, 226, 0.25);
   --gold: #f5b041;
   --gold-dim: #c47d10;
   --gold-glow: rgba(245, 176, 65, 0.15);
@@ -66,9 +70,10 @@ body::after {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(0, 40, 80, 0.3) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(0, 20, 60, 0.2) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 0%, rgba(0, 100, 180, 0.1) 0%, transparent 40%);
+    radial-gradient(ellipse at 20% 20%, rgba(30, 10, 60, 0.35) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(10, 6, 30, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 0%, rgba(60, 20, 120, 0.12) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 40%, rgba(0, 40, 80, 0.2) 0%, transparent 45%);
   pointer-events: none;
   z-index: 0;
 }
@@ -87,24 +92,26 @@ body::after {
 
 /* ─── CYBER CARD ──────────────────────────── */
 .cyber-card {
-  background: linear-gradient(135deg, rgba(6,13,24,0.95) 0%, rgba(4,8,16,0.98) 100%);
-  border: 1px solid rgba(0, 212, 255, 0.12);
-  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(4,12,26,0.95) 0%, rgba(10,6,30,0.95) 100%);
+  border: 1px solid rgba(138, 43, 226, 0.25);
+  border-radius: 0.5rem;
   position: relative;
   overflow: hidden;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 .cyber-card::before {
   content: '';
   position: absolute;
   top: 0; left: 0;
-  right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
-  opacity: 0.4;
+  right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--purple), var(--cyan), transparent);
+  opacity: 0.7;
+  animation: shimmerLine 3s ease-in-out infinite;
 }
 .cyber-card:hover {
-  border-color: rgba(0, 212, 255, 0.3);
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.05), inset 0 0 40px rgba(0, 212, 255, 0.02);
+  border-color: rgba(138, 43, 226, 0.45);
+  box-shadow: 0 0 25px rgba(138, 43, 226, 0.12), 0 0 60px rgba(0, 212, 255, 0.04);
+  transform: translateY(-1px);
 }
 
 /* ─── CYBER CARD GOLD VARIANT ─────────────── */
@@ -397,9 +404,79 @@ body::after {
 
 /* ─── GLASSMORPHISM ──────────────────────── */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.05);
+  background: linear-gradient(135deg, rgba(4,12,26,0.95) 0%, rgba(10,6,30,0.95) 100%);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(138, 43, 226, 0.25);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* ─── SHIMMER LINE ANIMATION ────────────── */
+@keyframes shimmerLine {
+  0%, 100% { background-position: -200% center; }
+  50% { background-position: 200% center; }
+}
+
+/* ─── GLOW PULSE ANIMATION ──────────────── */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(138,43,226,0.2); }
+  50% { box-shadow: 0 0 20px rgba(138,43,226,0.4), 0 0 40px rgba(0,212,255,0.1); }
+}
+.animate-glow { animation: glowPulse 3s ease-in-out infinite; }
+
+/* ─── SLIDE IN UP ───────────────────────── */
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.slide-in { animation: slideInUp 0.4s ease-out forwards; }
+.slide-in-1 { animation: slideInUp 0.4s 0.05s ease-out both; }
+.slide-in-2 { animation: slideInUp 0.4s 0.10s ease-out both; }
+.slide-in-3 { animation: slideInUp 0.4s 0.15s ease-out both; }
+.slide-in-4 { animation: slideInUp 0.4s 0.20s ease-out both; }
+.slide-in-5 { animation: slideInUp 0.4s 0.25s ease-out both; }
+
+/* ─── BORDER GLOW ───────────────────────── */
+@keyframes borderGlow {
+  0%, 100% { border-color: rgba(138,43,226,0.25); }
+  50% { border-color: rgba(138,43,226,0.45); }
+}
+.animate-border-glow { animation: borderGlow 4s ease-in-out infinite; }
+
+/* ─── PROGRESS BAR FILL ─────────────────── */
+@keyframes progressFill {
+  from { width: 0%; }
+}
+.animate-progress { animation: progressFill 1.2s ease-out forwards; }
+
+/* ─── ROW HIGHLIGHT ─────────────────────── */
+.cyber-row {
+  transition: all 0.2s ease;
+}
+.cyber-row:hover {
+  background: rgba(138, 43, 226, 0.08) !important;
+  border-color: rgba(138, 43, 226, 0.3) !important;
+  box-shadow: inset 0 0 20px rgba(138, 43, 226, 0.05);
+}
+
+/* ─── PURPLE ACCENT LINE ────────────────── */
+.accent-line-top {
+  position: relative;
+}
+.accent-line-top::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #8a2be2, #00d4ff, transparent);
+  z-index: 1;
+}
+
+/* ─── PURPLE DOT PULSE ──────────────────── */
+.pulse-purple {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--purple-light);
+  box-shadow: 0 0 8px var(--purple);
+  animation: pulseDot 2s ease-in-out infinite;
 }

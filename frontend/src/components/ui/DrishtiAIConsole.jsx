@@ -154,18 +154,26 @@ export default function DrishtiAIConsole() {
   };
 
   return (
-    <div className={`glass-panel rounded-lg flex flex-col transition-all duration-300 bg-[#0a0a2e]/80 border-[#f5b041]/30 ${isCollapsed ? 'h-[50px]' : 'h-full min-h-[300px]'}`}>
+    <div 
+      className={`rounded-lg flex flex-col transition-all duration-300 accent-line-top animate-border-glow slide-in-3 ${isCollapsed ? 'h-[50px]' : 'h-full min-h-[300px]'}`}
+      style={{
+        background: 'linear-gradient(135deg, rgba(4, 12, 26, 0.95) 0%, rgba(10, 6, 30, 0.95) 100%)',
+        border: '1px solid rgba(138, 43, 226, 0.25)',
+        overflow: 'hidden',
+        position: 'relative'
+      }}
+    >
       
       {/* Header */}
       <div 
-        className="p-3 border-b border-[#f5b041]/20 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
+        className="p-3 border-b border-purple-500/20 flex items-center justify-between cursor-pointer hover:bg-white/5 transition-colors"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="flex items-center gap-2">
-          <Bot className="text-[#f5b041]" size={18} />
-          <p className="font-orbitron text-xs tracking-widest text-[#f5b041] font-bold">DRISHTI AI</p>
+          <Bot className="text-[#b388ff]" size={18} />
+          <p className="font-orbitron text-xs tracking-widest text-[#b388ff] font-bold">DRISHTI AI</p>
         </div>
-        {isCollapsed ? <ChevronDown size={16} className="text-text-muted" /> : <ChevronUp size={16} className="text-text-muted" />}
+        {isCollapsed ? <ChevronDown size={16} className="text-[#7a8290]" /> : <ChevronUp size={16} className="text-[#7a8290]" />}
       </div>
 
       {/* Chat Area */}
@@ -177,7 +185,7 @@ export default function DrishtiAIConsole() {
                 <div className={`flex items-start gap-2 max-w-[90%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                   
                   {/* Avatar */}
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${msg.sender === 'user' ? 'bg-[#00d4ff]/20 text-[#00d4ff]' : 'bg-[#f5b041]/20 text-[#f5b041]'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${msg.sender === 'user' ? 'bg-[#00d4ff]/20 text-[#00d4ff]' : 'bg-[#b388ff]/20 text-[#b388ff]'}`}>
                     {msg.sender === 'user' ? <User size={12} /> : <Bot size={12} />}
                   </div>
 
@@ -185,7 +193,7 @@ export default function DrishtiAIConsole() {
                   <div className={`p-3 rounded-lg text-sm font-inter shadow-lg ${
                     msg.sender === 'user' 
                       ? 'bg-[#00d4ff]/10 border border-[#00d4ff]/20 text-[#e8f4fd] rounded-br-none' 
-                      : 'bg-black/40 border border-[#f5b041]/20 text-[#e8f4fd] rounded-bl-none w-full'
+                      : 'bg-black/40 border border-purple-500/20 text-[#e8f4fd] rounded-bl-none w-full'
                   }`}>
                     {msg.sender === 'user' ? (
                       <span className="text-xs">{msg.text}</span>
@@ -200,12 +208,12 @@ export default function DrishtiAIConsole() {
             {loading && (
               <div className="flex flex-col items-start">
                 <div className="flex items-start gap-2 max-w-[90%] flex-row">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 bg-[#f5b041]/20 text-[#f5b041]">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 bg-[#b388ff]/20 text-[#b388ff]">
                     <Bot size={12} />
                   </div>
-                  <div className="p-3 rounded-lg bg-black/40 border border-[#f5b041]/20 rounded-bl-none flex items-center gap-2">
-                    <Loader2 size={14} className="text-[#f5b041] animate-spin" />
-                    <span className="text-xs text-[#f5b041] font-orbitron tracking-widest">ANALYZING...</span>
+                  <div className="p-3 rounded-lg bg-black/40 border border-purple-500/20 rounded-bl-none flex items-center gap-2">
+                    <Loader2 size={14} className="text-[#b388ff] animate-spin" />
+                    <span className="text-xs text-[#b388ff] font-orbitron tracking-widest">ANALYZING...</span>
                   </div>
                 </div>
               </div>
@@ -215,7 +223,7 @@ export default function DrishtiAIConsole() {
           </div>
 
           {/* Input Area */}
-          <div className="p-3 border-t border-[#f5b041]/20 bg-black/20">
+          <div className="p-3 border-t border-purple-500/20 bg-black/20">
             <form onSubmit={handleSend} className="flex gap-2">
               <input 
                 type="text" 
@@ -223,12 +231,12 @@ export default function DrishtiAIConsole() {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask Drishti AI..." 
                 disabled={loading}
-                className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-sm font-inter text-text-primary focus:outline-none focus:border-[#f5b041]/50 focus:shadow-[0_0_10px_rgba(245,176,65,0.2)] transition-all disabled:opacity-50"
+                className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-sm font-inter text-text-primary focus:outline-none focus:border-purple-500/50 focus:shadow-[0_0_10px_rgba(138,43,226,0.2)] transition-all disabled:opacity-50"
               />
               <button 
                 type="submit"
                 disabled={loading}
-                className="bg-[#f5b041]/10 border border-[#f5b041]/30 text-[#f5b041] p-2 rounded hover:bg-[#f5b041]/20 transition-colors disabled:opacity-50"
+                className="bg-[#b388ff]/10 border border-[#b388ff]/30 text-[#b388ff] p-2 rounded hover:bg-[#b388ff]/20 transition-colors disabled:opacity-50"
               >
                 <Send size={18} />
               </button>
