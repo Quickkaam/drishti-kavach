@@ -1,4 +1,4 @@
-﻿// ============================================
+// ============================================
 // Drishti Kavach — Audit & System Log Routes
 // ============================================
 
@@ -14,7 +14,7 @@ router.get('/audit', async (req, res) => {
   try {
     const { website_id, action, page = 1, limit = 50 } = req.query;
     let query = supabase
-      .from('system_audit_logs')
+      .from('audit_logs')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1);
@@ -74,7 +74,7 @@ router.get('/security', async (req, res) => {
   try {
     const { action, page = 1, limit = 50, startDate, endDate } = req.query;
     let query = supabase
-      .from('system_audit_logs')
+      .from('audit_logs')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1);
