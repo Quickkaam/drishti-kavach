@@ -180,7 +180,7 @@ export default function DrishtiAIConsole() {
       {/* Chat Area */}
       {!isCollapsed && (
         <>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 custom-scrollbar" style={{ minHeight: 0 }}>
             {messages.map(msg => (
               <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
                 <div className={`flex items-start gap-2 max-w-[90%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
