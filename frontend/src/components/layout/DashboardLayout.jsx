@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import MobileNavigation from './MobileNavigation';
 import { useTheme, ThemeToggleButton, ThemeStatus } from '../ui/ThemeToggle';
 import NotificationBell from '../ui/NotificationBell';
-import { Database, Bot, Cloud, Activity, LogOut, Shield } from 'lucide-react';
+import { Database, Bot, Cloud, Activity, LogOut, Shield, Calendar } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
 import VoiceAssistant from '../ui/VoiceAssistant';
 import AICoPilot from '../ui/AICoPilot';
@@ -30,7 +30,7 @@ const NAV = [
   { path: '/users',      icon: '◎', label: 'USERS',       adminOnly: true },
   { path: '/credentials',icon: '🔑', label: 'CREDENTIALS', superAdminOnly: true },
   { path: '/audit',      icon: '≡', label: 'AUDIT LOG',   adminOnly: true },
-  { path: '/calendar',     icon: '�', label: 'CALENDAR', badge: 'NEW' },
+  { path: '/calendar',     icon: <Calendar size={16} />, label: 'CALENDAR', badge: 'NEW' },
   { path: '/settings',   icon: '⚙', label: 'SETTINGS' },
   { path: '/sentinel',   icon: <Shield size={16} />, label: 'SENTINEL',   superAdminOnly: true, badge: 'NEW' },
 ];
@@ -669,4 +669,7 @@ export default function DashboardLayout() {
     </div>
   );
 }
+
+
+
 
