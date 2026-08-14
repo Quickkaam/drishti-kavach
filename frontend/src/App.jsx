@@ -32,6 +32,7 @@ import Settings from './pages/Settings';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
 import Analytics from './pages/Analytics';
+import Calendar from './pages/Calendar';
 import MitreMatrix from './pages/MitreMatrix';
 import SentinelAdmin from './pages/SentinelAdmin';
 
@@ -90,6 +91,7 @@ export default function App() {
                 <Route path="notifications" element={lazyLoad(NotificationsPage)} />
                 <Route path="settings" element={lazyLoad(Settings)} />
                 <Route path="analytics" element={lazyLoad(Analytics)} />
+                <Route path="calendar" element={lazyLoad(Calendar)} />
                 <Route path="mitre" element={lazyLoad(MitreMatrix)} />
                 <Route path="sentinel" element={<ProtectedRoute roles={['superadmin', 'admin']}><SentinelAdmin /></ProtectedRoute>} />
               </Route>
