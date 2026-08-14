@@ -30,7 +30,7 @@ const NAV = [
   { path: '/users',      icon: '◎', label: 'USERS',       adminOnly: true },
   { path: '/credentials',icon: '🔑', label: 'CREDENTIALS', superAdminOnly: true },
   { path: '/audit',      icon: '≡', label: 'AUDIT LOG',   adminOnly: true },
-  { path: '/notifications', icon: '🔔', label: 'NOTIFICATIONS' },
+  { path: '/calendar',     icon: '�', label: 'CALENDAR', badge: 'NEW' },
   { path: '/settings',   icon: '⚙', label: 'SETTINGS' },
   { path: '/sentinel',   icon: <Shield size={16} />, label: 'SENTINEL',   superAdminOnly: true, badge: 'NEW' },
 ];
