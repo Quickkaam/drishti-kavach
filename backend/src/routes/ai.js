@@ -442,6 +442,58 @@ router.post('/execute-suggestion', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/ai/calendar - 30-day activity calendar
+router.get('/calendar', async (req, res) => {
+  try {
+    const { website_id } = req.query;
+    const websiteId = typeof website_id === 'string' ? parseInt(website_id, 10) : website_id;
+    
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 29);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+    
+    // Get security events grouped by date
+    const { data: securityEvents } = await supabase
+      .from('security_events')
+      .select('severity, created_at')
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .lte('created_at', today.toISOString());
+    
+    // Get AI actions grouped by date
+    const { data: aiActions } = await supabase
+      .from('ai_decisions')
+      .select('status, created_at')
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .lte('created_at', today.toISOString());
+    
+    // Build calendar data
+    const calendarData = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayEvents = securityEvents?.filter(e => e.created_at.startsWith(dateStr)) || [];
+      const dayActions = aiActions?.filter(a => a.created_at.startsWith(dateStr)) || [];
+      
+      calendarData.push({
+        date: dateStr,
+        critical: dayEvents.filter(e => e.severity === 'critical').length,
+        high: dayEvents.filter(e => e.severity === 'high').length,
+        medium: dayEvents.filter(e => e.severity === 'medium').length,
+        low: dayEvents.filter(e => e.severity === 'low').length,
+        aiActions: dayActions.length
+      });
+    }
+    
+    res.json({ calendar: calendarData });
+  } catch (err) {
+    console.error('[CALENDAR ERROR]', err.message);
+    res.status(500).json({ error: 'Failed to fetch calendar data' });
+  }
+});
+
 module.exports = router;
 
 

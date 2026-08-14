@@ -10,6 +10,7 @@ import IncidentFeed from '../components/ui/IncidentFeed';
 import DrishtiAIConsole from '../components/ui/DrishtiAIConsole';
 import SystemHealthDashboard from '../components/ui/SystemHealthDashboard';
 import FederationWidget from '../components/ui/FederationWidget';
+import ActivityCalendar from '../components/ui/ActivityCalendar';
 
 export default function Overview() {
   const [stats, setStats] = useState({});
@@ -62,6 +63,11 @@ export default function Overview() {
           {/* Top Half: System Health */}
           <div className="flex-shrink-0">
              <SystemHealthDashboard trends={trends} />
+          </div>
+          
+          {/* Middle: 30-Day Activity Calendar */}
+          <div className="flex-shrink-0">
+            <ActivityCalendar />
           </div>
           
           {/* Bottom Half: Drishti AI Console */}
